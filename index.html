@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis">
+  <meta name="keywords" content="Cross-embodiment, Mobility Policy, Residual RL, Policy Distillation">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis</title>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-2 publication-title">
+            COMPASS: Cross Embodiment Mobility Policy<br>
+            via Residual RL and Skill Synthesis
+          </h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              Wei Liu<sup>1</sup>,</span>
+            <span class="author-block">
+              Huihua Zhao<sup>1</sup>,</span>
+            <span class="author-block">
+              Chenran Li<sup>1,2</sup>,
+            </span>
+            <span class="author-block">
+              Joydeep Biswas<sup>1,3</sup>,
+            </span>
+            <span class="author-block">
+              Soha Pouya<sup>1</sup>,
+            </span>
+            <span class="author-block">
+              Yan Chang<sup>1</sup>,
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>Nvidia,</span>
+            <span class="author-block"><sup>2</sup>UC Berkeley</span>
+            <span class="author-block"><sup>3</sup>UT Austin</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2011.12948"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2011.12948"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/NVlabs/COMPASS"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                  </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <video id="teaser" autoplay muted loop playsinline height="100%">
+        <source src="./static/videos/merged_grid.mp4"
+                type="video/mp4">
+      </video>
+      <h2 class="subtitle has-text-centered">
+        COMPASS enables cross-embodiment mobility policy via residual RL and policy distillation.
+      </h2>
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            As robots are increasingly deployed in diverse application domains, generalizable cross-embodiment mobility policies are increasingly essential. While classical mobility stacks have proven effective on specific robot platforms, they pose significant challenges when scaling to new embodiments. Learning-based methods, such as imitation learning (IL) and reinforcement learning (RL), offer alternative solutions but suffer from covariate shift, sparse sampling in large environments, and embodiment-specific constraints.
+          </p>
+          <p>
+            This work introduces COMPASS, a novel workflow for developing cross-embodiment mobility policies by integrating IL, residual RL, and policy distillation. We begin with IL on a mobile robot, leveraging easily accessible teacher policies to train a foundational model that combines a world model with a mobility policy. Building on this base, we employ residual RL to fine-tune embodiment-specific policies, exploiting pre-trained representations to improve sampling efficiency in handling various physical constraints and sensor modalities. Finally, policy distillation merges these embodiment-specialist policies into a single robust cross-embodiment policy.
+          </p>
+          <p>
+            We empirically demonstrate that COMPASS scales effectively across diverse robot platforms while maintaining adaptability to various environment configurations, achieving a generalist policy with a success rate approximately 5X higher than the pre-trained IL policy. The resulting framework offers an efficient, scalable solution for cross-embodiment mobility, enabling robots with different designs to navigate safely and efficiently in complex scenarios.
+          </p>
+        </div>
+      </div>
+    </div>
+    <!--/ Abstract. -->
+
+    <!-- Paper video. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="publication-video">
+          <iframe src="./static/videos/compass_overview.mp4"
+                  frameborder="0" allow="encrypted-media" allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
+    <!--/ Paper video. -->
+  </div>
+</section>
+
+<section class="section">
+    <div class="container is-max-desktop">
+      <!-- Method -->
+      <div class="columns is-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Method</h2>
+          
+          <!-- Method figure -->
+          <div class="content has-text-centered">
+            <div class="columns is-centered">
+              <div class="column is-full-width">
+                <img src="./static/images/method.png" alt="Method overview">
+              </div>
+            </div>
+            <p class="caption">COMPASS: (1) Imitation Learning for mobility priors, (2) Residual RL for embodiment-specific adaptation, and (3) Policy Distillation for skill synthesis.</p>
+          </div>
+  
+          <!-- Method description -->
+          <div class="content has-text-justified">
+            <h3 class="title is-4">Three-Stage Learning Framework</h3>
+            <p>
+              COMPASS introduces a novel three-stage learning framework for developing cross-embodiment mobility policies:
+            </p>
+            <ol>
+              <li><strong>Imitation Learning:</strong> We first train a foundational model that combines a world model with a mobility policy using easily accessible teacher policies.</li>
+              <li><strong>Residual RL:</strong> Building on the base policy, we employ residual reinforcement learning to fine-tune embodiment-specific policies, handling various physical constraints and sensor modalities.</li>
+              <li><strong>Policy Distillation:</strong> Finally, we merge these embodiment-specialist policies into a single robust cross-embodiment policy through policy distillation.</li>
+            </ol>
+            <p>
+              This approach enables efficient transfer of mobility skills across diverse robot platforms while maintaining adaptability to various environment configurations.
+            </p>
+          </div>
+        </div>
+      </div>
+      <!--/ Method -->
+    </div>
+  </section>
+
+
+  
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Cross-embodiment Introduction -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Cross-embodiment Mobility</h2>
+        <div class="content has-text-justified">
+          <p>
+            Extensive experiments demonstrate that COMPASS can achieves robust generalization across diverse robot platforms while preserving the adaptability needed to succeed in varied environments.
+          </p>
+        </div>
+
+        <!-- 2x2 Video Grid -->
+        <div class="columns is-multiline">
+          <!-- Video 1 -->
+          <div class="column is-6">
+            <div class="content has-text-centered">
+              <video id="h1-video" autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/h1.mp4" type="video/mp4">
+              </video>
+              <p class="caption">H1 (Humanoid)</p>
+            </div>
+          </div>
+
+          <!-- Video 2 -->
+          <div class="column is-6">
+            <div class="content has-text-centered">
+              <video id="spot-video" autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/spot.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Spot Mini (Quadruped)</p>
+            </div>
+          </div>
+
+          <!-- Video 3 -->
+          <div class="column is-6">
+            <div class="content has-text-centered">
+              <video id="carter-video" autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/carter.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Carter (Wheeled)</p>
+            </div>
+          </div>
+
+          <!-- Video 4 -->
+          <div class="column is-6">
+            <div class="content has-text-centered">
+              <video id="digit-video" autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/digit.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Digit (Humanoid)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Zero-shot Multi-robot Interaction -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Zero-shot Multi-robot Interaction</h2>
+        <div class="content has-text-justified">
+          <p>
+            While not explicitly trained to handle dynamic obstacles, COMPASS demonstrates robust zero-shot capabilities, efficiently replanning and showcasing a solid understanding of the environments.
+          </p>
+        </div>
+
+        <!-- 2x1 Video Grid (Vertical Stack) -->
+        <div class="content">
+          <!-- Video 1 -->
+          <div class="mb-5">
+            <div class="content has-text-centered">
+              <video autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/interaction_office.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Humanoid interaction in a shared workspace.</p>
+            </div>
+          </div>
+
+          <!-- Video 2 -->
+          <div>
+            <div class="content has-text-centered">
+              <video autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/interaction_warehouse.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Humanoid interaction in a warehouse.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{park2021nerfies,
+  author    = {Park, Keunhong and Sinha, Utkarsh and Barron, Jonathan T. and Bouaziz, Sofien and Goldman, Dan B and Seitz, Steven M. and Martin-Brualla, Ricardo},
+  title     = {Nerfies: Deformable Neural Radiance Fields},
+  journal   = {ICCV},
+  year      = {2021},
+}</code></pre>
+  </div>
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // List of video IDs to limit and their durations
+    const videoLimits = {
+      'h1-video': 10,
+      'spot-video': 8,
+      'carter-video': 5,
+      'digit-video': 15
+    };
+
+    // Apply limits only to specified videos
+    Object.entries(videoLimits).forEach(([videoId, maxDuration]) => {
+      const video = document.getElementById(videoId);
+      if (video) {
+        video.addEventListener('timeupdate', function() {
+          if (this.currentTime >= maxDuration) {
+            this.currentTime = 0; // Reset to beginning
+          }
+        });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
