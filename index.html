@@ -36,6 +36,15 @@
   <script src="./static/js/bulma-slider.min.js"></script>
   <script src="./static/js/index.js"></script>
   <link rel="icon" href="data:,">
+
+  <style>
+    .publication-title {
+      font-weight: normal;  /* Make base text normal weight */
+    }
+    .publication-title strong {
+      font-weight: 700;     /* Make bold text heavier */
+    }
+  </style>
 </head>
 <body>
 
@@ -45,8 +54,8 @@
       <div class="columns is-centered">
         <div class="column has-text-centered">
           <h1 class="title is-2 publication-title">
-            COMPASS: Cross Embodiment Mobility Policy<br>
-            via Residual RL and Skill Synthesis
+            <strong>COMPASS</strong>: <strong>C</strong>ross-emb<strong>O</strong>diment <strong>M</strong>obility <strong>P</strong>olicy<br>
+            via Residu<strong>A</strong>l RL and <strong>S</strong>kill <strong>S</strong>ynthesis
           </h1>
           <div class="is-size-5 publication-authors">
             <span class="author-block">
@@ -63,7 +72,7 @@
               Soha Pouya<sup>1</sup>,
             </span>
             <span class="author-block">
-              Yan Chang<sup>1</sup>,
+              Yan Chang<sup>1</sup>
             </span>
           </div>
 
@@ -108,9 +117,6 @@
         <source src="./static/videos/merged_grid.mp4"
                 type="video/mp4">
       </video>
-      <h2 class="subtitle has-text-centered">
-        COMPASS enables cross-embodiment mobility policy via residual RL and policy distillation.
-      </h2>
     </div>
   </div>
 </section>
@@ -164,14 +170,13 @@
                 <img src="./static/images/method.png" alt="Method overview">
               </div>
             </div>
-            <p class="caption">COMPASS: (1) Imitation Learning for mobility priors, (2) Residual RL for embodiment-specific adaptation, and (3) Policy Distillation for skill synthesis.</p>
           </div>
   
           <!-- Method description -->
           <div class="content has-text-justified">
-            <h3 class="title is-4">Three-Stage Learning Framework</h3>
+            <h3 class="title is-4">Three-Stage Learning Workflow</h3>
             <p>
-              COMPASS introduces a novel three-stage learning framework for developing cross-embodiment mobility policies:
+              COMPASS introduces a novel three-stage learning workflow for developing cross-embodiment mobility policies:
             </p>
             <ol>
               <li><strong>Imitation Learning:</strong> We first train a foundational model that combines a world model with a mobility policy using easily accessible teacher policies.</li>
@@ -195,11 +200,19 @@
     <!-- Cross-embodiment Introduction -->
     <div class="columns is-centered">
       <div class="column is-full-width">
-        <h2 class="title is-3">Cross-embodiment Mobility</h2>
+        <h2 class="title is-3">Results</h2>
         <div class="content has-text-justified">
           <p>
-            Extensive experiments demonstrate that COMPASS can achieves robust generalization across diverse robot platforms while preserving the adaptability needed to succeed in varied environments.
+            Extensive experiments demonstrate that COMPASS can achieves robust generalization across diverse robot platforms while preserving the adaptability needed to succeed in varied environments. Quantitatively, the RL specialists and the distilled generalist policy can achieve a 5X higher success rate and 3X lower travel time on average than the pre-trained IL policy (X-Mobility).
           </p>
+        </div>
+        <!-- Benchmark figure -->
+        <div class="content has-text-centered">
+            <div class="columns is-centered">
+                <div class="column is-full-width">
+                <img src="./static/images/benchmark.png" alt="Benchmark Results">
+                </div>
+            </div>
         </div>
 
         <!-- 2x2 Video Grid -->
@@ -237,10 +250,10 @@
           <!-- Video 4 -->
           <div class="column is-6">
             <div class="content has-text-centered">
-              <video id="digit-video" autoplay muted loop playsinline width="100%">
-                <source src="./static/videos/digit.mp4" type="video/mp4">
+              <video id="g1-video" autoplay muted loop playsinline width="100%">
+                <source src="./static/videos/g1.mp4" type="video/mp4">
               </video>
-              <p class="caption">Digit (Humanoid)</p>
+              <p class="caption">G1 (Humanoid)</p>
             </div>
           </div>
         </div>
@@ -248,6 +261,7 @@
     </div>
   </div>
 </section>
+
 
 <section class="section">
   <div class="container is-max-desktop">
@@ -288,17 +302,17 @@
   </div>
 </section>
 
-<!-- <section class="section" id="BibTeX">
+<section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
-    <pre><code>@article{park2021nerfies,
-  author    = {Park, Keunhong and Sinha, Utkarsh and Barron, Jonathan T. and Bouaziz, Sofien and Goldman, Dan B and Seitz, Steven M. and Martin-Brualla, Ricardo},
-  title     = {Nerfies: Deformable Neural Radiance Fields},
-  journal   = {ICCV},
-  year      = {2021},
+    <pre><code>@article{liu2025compass,
+  author    = {Wei Liu, Huihua Zhao, Chenran Li, Joydeep Biswas, Soha Pouya, Yan Chang},
+  title     = {COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis},
+  journal   = {arXiv},
+  year      = {2025},
 }</code></pre>
   </div>
-</section> -->
+</section>
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -307,7 +321,7 @@
       'h1-video': 10,
       'spot-video': 8,
       'carter-video': 5,
-      'digit-video': 15
+      'g1-video': 10
     };
 
     // Apply limits only to specified videos
@@ -323,6 +337,21 @@
     });
   });
 </script>
+
+<footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+                Page template borrowed from <a
+                href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
 
 </body>
 </html>
