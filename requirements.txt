@@ -1,0 +1,14 @@
+einops
+gin-config
+h5py
+matplotlib
+moviepy
+numpy
+onnx
+pandas
+pytorch-lightning
+timm
+torcheval
+transformers
+wandb
+wheel
