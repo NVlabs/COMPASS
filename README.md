@@ -68,7 +68,7 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
   ```bash
   ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install x_mobility/x_mobility-0.1.0-py3-none-any.whl
   ```
-* Download the pre-trained X-Mobility checkpoint from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_generalist.ckpt
+* Download the pre-trained X-Mobility checkpoint from: https://huggingface.co/nvidia/X-Mobility/blob/main/x_mobility-nav2-semantic_action_path.ckpt
 
 ### 5. Residual RL environment USDs
 * Download the residual RL environment USDs from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_usds.zip
@@ -196,7 +196,7 @@ We provide a pre-trained generalist policy that works across four robot embodime
 * **Spot** (quadruped)
 
 To try out the pre-trained generalist policy:
-1. Download the checkpoint from [Hugging Face](https://huggingface.co/nvidia/COMPASS)
+1. Download the checkpoint from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_generalist.ckpt
 2. Use the evaluation command shown above with your downloaded checkpoint:
    ```bash
    ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
