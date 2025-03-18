@@ -1,0 +1,20 @@
+include 'configs/x_mobility_config.gin'
+
+NUM_STEPS_PER_ITER = 256
+
+# RL environment setup
+run.embodiment='h1'
+run.environment='combined_single_rack'
+run.num_steps_per_iteration=%NUM_STEPS_PER_ITER
+
+# Residual PPO Trainer
+ResidualPPOTrainer.num_steps_per_env=%NUM_STEPS_PER_ITER
+# Options include [CriticStateDepthEncoderAssembler, CriticStateSymmetricAssembler]
+ResidualPPOTrainer.critic_state_assembler=@CriticStateSymmetricAssembler
+
+# CriticObservationEncoder
+CriticObservationEncoder.depth_encoder=@DepthImageFeatureExtractor
+
+# Actor critic
+ActorCriticXMobility.critic_hidden_dims = 128
+ActorCriticXMobility.init_noise_std = 0.1

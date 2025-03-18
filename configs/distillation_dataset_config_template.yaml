@@ -1,0 +1,12 @@
+policy_ckpt_type: wandb_artifact # [wandb_artifact, local]
+
+embodiment_policies:
+  carter: "path_to_carter_ckpt"
+  h1: "path_to_h1_ckpt"
+  spot: "path_to_spot_ckpt"
+  g1: "path_to_g1_ckpt"
+
+data_split_ratios:
+  train: 0.8
+  val: 0.1
+  test: 0.1
