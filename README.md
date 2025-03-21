@@ -100,6 +100,7 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
       --video_interval <video_interval>
   ```
 
+Add additional argument `--headless` to run RL training/evaluation in headless mode.
 
 > **NOTE**: The GPU memory usage is proportional to the number of environments in residual RL training. For example, 32 environments will use around 30GB memory, so reduce the number of environments if you have limited GPU memory.
 
