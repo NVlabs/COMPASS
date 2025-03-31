@@ -28,11 +28,11 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
 
 ## Table of Contents
 - [Installation](#installation)
-  - [1. Isaac Lab Installation](#1-isaac-lab-installation)
-  - [2. Environment Setup](#2-environment-setup)
-  - [3. Dependencies](#3-dependencies)
-  - [4. X-Mobility Installation](#4-x-mobility-installation)
-  - [5. Residual RL Environment USDs](#5-residual-rl-environment-usds)
+  - [1. Residual RL Environment USDs](#1-residual-rl-environment-usds)
+  - [2. Isaac Lab Installation](#2-isaac-lab-installation)
+  - [3. Environment Setup](#3-environment-setup)
+  - [4. Dependencies](#4-dependencies)
+  - [5. X-Mobility Installation](#5-x-mobility-installation)
 - [Usage](#usage)
   - [Residual RL Specialists](#residual-rl-specialists)
   - [Policy Distillation](#policy-distillation)
@@ -47,32 +47,32 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
 
 ## Installation
 
-### 1. Isaac Lab Installation
+### 1. Residual RL environment USDs
+* Download the residual RL environment USDs from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_usds.zip
+* Unzip and place the downloaded USDs in the `compass/rl_env/exts/mobility_es/mobility_es/usd` directory
+
+### 2. Isaac Lab Installation
 * Install Isaac Lab and the residual RL mobility extension by following this [instruction](compass/rl_env/README.md).
 
-### 2. Environment Setup
+### 3. Environment Setup
 * Create and activate a virtual environment:
   ```bash
   python3 -m venv venv
   source venv/bin/activate
   ```
 
-### 3. Dependencies
+### 4. Dependencies
 * Install the required packages:
   ```bash
   ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -r requirements.txt
   ```
 
-### 4. X-Mobility Installation
+### 5. X-Mobility Installation
 * Install the [X-Mobility](https://github.com/NVlabs/X-MOBILITY) package:
   ```bash
   ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install x_mobility/x_mobility-0.1.0-py3-none-any.whl
   ```
 * Download the pre-trained X-Mobility checkpoint from: https://huggingface.co/nvidia/X-Mobility/blob/main/x_mobility-nav2-semantic_action_path.ckpt
-
-### 5. Residual RL environment USDs
-* Download the residual RL environment USDs from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_usds.zip
-* Unzip and place the downloaded USDs in the `compass/rl_env/exts/mobility_es/mobility_es/usd` directory
 
 
 ## Usage
