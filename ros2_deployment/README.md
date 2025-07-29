@@ -23,9 +23,7 @@ For detailed setup instructions and a step-by-step Isaac Sim integration guide, 
 
 The **compass_inference** node can also be deployed directly on real robots, enabling a seamless transition from simulation to real-world operation. By integrating visual SLAM solutions such as [cuVSLAM](https://nvidia-isaac-ros.github.io/concepts/visual_slam/cuvslam/index.html) for robot state estimation, the COMPASS model can support zero-shot Sim2Real transfer.
 
-<video width="640" height="360" controls>
-  <source src="./../images/compass_g1_zed.mp4" type="video/mp4">
-</video>
+https://github.com/user-attachments/assets/9fd51703-f59c-47a2-9398-aba135036b55
 
 ---
 
@@ -34,9 +32,8 @@ The **compass_inference** node can also be deployed directly on real robots, ena
 
 By integrating an object localization module (e.g., [Locate3D](https://locate3d.atmeta.com/)), we can also enable object navigation with COMPASS. The **obj_target_generator** node can convert localized object bounding boxes into navigation goals, allowing the robot to autonomously approach specified objects.
 
+https://github.com/user-attachments/assets/3928e9fd-f78d-4b8e-8bbc-9932b386ae6b
 
-<video width="640" height="360" controls>
-  <source src="./../images/locate3d_compass_w_side.mp4" type="video/mp4">
-</video>
+
 
 ---
