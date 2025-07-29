@@ -1,0 +1,6 @@
+include 'configs/shared.gin'
+
+run.num_iterations=1000
+run.num_envs=64
+run.run_mode='train'
+run.seed = 20

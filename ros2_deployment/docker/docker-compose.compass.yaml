@@ -1,0 +1,99 @@
+services:
+  # Compass ROS2 deployment service
+  compass-ros2-deploy:
+    profiles: ["compass_ros2"]
+    build:
+      context: ../../
+      dockerfile: ros2_deployment/docker/Dockerfile.deploy
+    image: compass-ros2-deploy:latest
+    container_name: compass-ros2-navigator
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      # FastDDS configuration file path (critical for inter-container communication)
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/home/compassuser/.ros/fastdds.xml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      # Compass Navigator ROS2 package only
+      - type: bind
+        source: ../compass_navigator
+        target: /home/compassuser/compass_ws/src/compass_navigator
+      # ONNX model file (downloaded by prepare_assets.sh)
+      - type: bind
+        source: ../assets/models/compass_carter.onnx
+        target: /tmp/models/compass_carter.onnx
+        read_only: true
+      # Persistent storage for converted TensorRT engines
+      - type: volume
+        source: compass-engines
+        target: /tmp/engines
+      # X11 forwarding for GUI applications
+      - type: bind
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+        read_only: true
+      # ROS2 FastDDS configuration (matches Isaac Sim container)
+      - type: bind
+        source: .ros/fastdds.xml
+        target: /home/compassuser/.ros/fastdds.xml
+        read_only: true
+    network_mode: host
+    ipc: host
+    privileged: true
+    cap_add:
+      - SYS_PTRACE
+    stdin_open: true
+    tty: true
+    user: compassuser
+    working_dir: /home/compassuser/compass_ws
+    command: >
+      bash -c "
+      echo '🚀 Compass ROS2 Navigation Container ===';
+      echo '';
+      echo '📡 ROS2 Communication Setup:';
+      echo '  - FastDDS config: /home/compassuser/.ros/fastdds.xml';
+      echo '  - ROS_DOMAIN_ID: '$$ROS_DOMAIN_ID' (set by compass_container.py)';
+      echo '  - Network: host (shared with Isaac Sim)';
+      echo '  - IPC: host (shared memory communication)';
+      echo '';
+      echo '📁 Container Information:';
+      echo '  - User: compassuser';
+      echo '  - Workspace: /home/compassuser/compass_ws';
+      echo '  - ONNX Model: /tmp/models/compass_carter.onnx';
+      echo '  - TensorRT Engines: /tmp/engines/';
+      echo '';
+      echo '🛠️ Setup Steps:';
+      echo '  1. Convert ONNX to TensorRT (first time):';
+      echo '     python3 /usr/local/bin/trt_conversion.py \\';
+      echo '       --onnx-path /tmp/models/compass_carter.onnx \\';
+      echo '       --trt-path /tmp/engines/compass_carter.engine';
+      echo '';
+      echo '  2. Build workspace (if needed):';
+      echo '     source /opt/ros/humble/setup.bash';
+      echo '     colcon build --symlink-install';
+      echo '';
+      echo '  3. Launch navigator:';
+      echo '     launch_compass.sh';
+      echo '';
+      echo '🎮 Isaac Sim Integration:';
+      echo '  - Launch Isaac Sim: ./compass_container.py launch_isaac_sim';
+      echo '  - Topics are shared via host networking';
+      echo '  - Use: ros2 topic list  # to verify communication';
+      echo '';
+      echo '⚙️ Optional launch parameters:';
+      echo '     launch_compass.sh use_sim_time:=true  # Use simulation time';
+      echo '';
+      echo '✅ Container ready. Run the commands above to start navigation.';
+      bash
+      "
+
+volumes:
+  # TensorRT engine storage
+  compass-engines:

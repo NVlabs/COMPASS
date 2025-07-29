@@ -1,0 +1,21 @@
+# Train
+train.epochs=100
+train.precision="16-mixed"
+train.data_module=@RLSpecialistDataModule
+train.model_trainer=@ESDistillationTrainer
+
+#Trainer
+ESDistillationTrainer.lr=1e-3
+ESDistillationTrainer.model=@ESDistillationPolicy
+ESDistillationTrainer.loss=@ESDistillationKLLoss
+
+# Dataloader
+RLSpecialistDataModule.batch_size=16
+RLSpecialistDataModule.sequence_length=5
+RLSpecialistDataModule.num_workers=2
+
+# Embodiment specialist distillation policy
+ESDistillationPolicy.policy_model=@MLPActionPolicyDistribution
+ESDistillationPolicy.embodiment_encoder=@EmbodimentOneHotEncoder
+ESDistillationPolicy.policy_state_dim=2048
+ESDistillationPolicy.command_n_channels=6

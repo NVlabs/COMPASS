@@ -1,0 +1,152 @@
+# Compass ROS2 Navigation Deployment Container
+# Uses NVIDIA CUDA 11.8.0 base image with Ubuntu 22.04 for ROS2 Humble compatibility
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Set up locale
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+ENV PYTHONIOENCODING=utf-8
+
+# Install basic system dependencies
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    curl \
+    wget \
+    gnupg2 \
+    lsb-release \
+    ca-certificates \
+    build-essential \
+    cmake \
+    git \
+    python3 \
+    python3-pip \
+    python3-dev \
+    pkg-config \
+    libfreetype6-dev \
+    libfontconfig1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add ROS2 apt repository
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+# Fix package version conflicts and install ROS2 dependencies
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    # Fix libbrotli version conflict
+    apt-get install -y --no-install-recommends --allow-downgrades \
+    libbrotli1=1.0.9-2build6 \
+    libbrotli-dev=1.0.9-2build6 \
+    && apt-mark hold libbrotli1 libbrotli-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ROS2 Humble desktop and additional packages
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    # Core ROS2 packages (minimal installation)
+    ros-humble-ros-core \
+    ros-humble-rclpy \
+    # Message packages
+    ros-humble-geometry-msgs \
+    ros-humble-sensor-msgs \
+    ros-humble-nav-msgs \
+    ros-humble-std-msgs \
+    ros-humble-vision-msgs \
+    # Transform packages
+    ros-humble-tf2-ros \
+    ros-humble-tf2-geometry-msgs \
+    ros-humble-tf-transformations \
+    # Image processing
+    ros-humble-cv-bridge \
+    # Visualization (optional - can be removed for headless deployment)
+    ros-humble-rviz2 \
+    # Development tools
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+# Initialize rosdep
+RUN rosdep init && rosdep update
+
+# Install TensorRT through NVIDIA apt repository
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+    tensorrt \
+    python3-libnvinfer \
+    python3-libnvinfer-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set CUDA 11.8 environment variables
+ENV PATH="/usr/local/cuda-11.8/bin:${PATH}"
+ENV CUDA_HOME="/usr/local/cuda-11.8"
+ENV LD_LIBRARY_PATH="/usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}"
+
+# Create a non-root user for development
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g ${GROUP_ID} compassuser && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash compassuser
+
+# Switch to compassuser
+USER compassuser
+WORKDIR /home/compassuser
+
+# Upgrade pip and install basic Python dependencies
+RUN pip3 install --upgrade pip setuptools==58.2.0 wheel
+
+# Install Python dependencies for compass navigation
+RUN --mount=type=cache,target=/home/compassuser/.cache/pip \
+    pip3 install --no-cache-dir \
+    "numpy>=1.19.5,<1.27.0" \
+    "scipy>=1.10.0,<1.11.0" \
+    "opencv-python<4.12" \
+    "transforms3d>=0.4.1" \
+    onnxruntime-gpu \
+    transformations \
+    onnx \
+    pycuda
+
+# Copy and install compass requirements
+COPY --chown=compassuser:compassuser requirements.txt /tmp/requirements.txt
+RUN --mount=type=cache,target=/home/compassuser/.cache/pip \
+    pip3 install --no-cache-dir -r /tmp/requirements.txt
+
+# Create all necessary directories in one layer
+RUN mkdir -p /home/compassuser/compass_ws/src \
+             /home/compassuser/.ros \
+             /tmp/models \
+             /tmp/engines
+
+# Copy scripts before switching to root for permissions
+COPY --chown=compassuser:compassuser ros2_deployment/docker/trt_conversion.py /usr/local/bin/trt_conversion.py
+COPY --chown=compassuser:compassuser ros2_deployment/launch_compass.sh /usr/local/bin/launch_compass.sh
+
+# Switch to root once to handle all ownership and permissions
+USER root
+RUN chown -R compassuser:compassuser /tmp/models /tmp/engines && \
+    chmod +x /usr/local/bin/trt_conversion.py && \
+    chmod +x /usr/local/bin/launch_compass.sh
+
+# Switch back to compassuser for the rest
+USER compassuser
+
+# Set up ROS2 environment in bashrc for interactive shells
+RUN echo "source /opt/ros/humble/setup.bash" >> /home/compassuser/.bashrc && \
+    echo "cd /home/compassuser/compass_ws" >> /home/compassuser/.bashrc
+
+# Set working directory to compass workspace
+WORKDIR /home/compassuser/compass_ws
+
+# Default command
+CMD ["/bin/bash"]

@@ -1,0 +1,9 @@
+include 'configs/shared.gin'
+
+run.num_iterations=20
+run.num_envs=16
+run.run_mode='record'
+run.seed = 30
+run.num_steps_per_iteration=128
+
+ResidualPPOTrainer.num_steps_per_env=128
