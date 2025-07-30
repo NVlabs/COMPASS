@@ -39,7 +39,6 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
   - [Model Export](#model-export)
   - [Add New Embodiment or Scene](#add-new-embodiment-or-scene)
   - [Logging](#logging)
-- [Pre-trained Generalist Policy Example](#pre-trained-generalist-policy-example)
 - [ROS2 Deployment](#ros2-deployment)
 - [License](#license)
 - [Core Contributors](#core-contributors)
@@ -192,31 +191,6 @@ The training and evaluation scripts use TensorBoard for logging by default. Weig
        --wandb-project-name "project_name" \
        --wandb-entity-name "your_username_or_team"
    ```
-
-## Pre-trained Generalist Policy Example
-
-We provide a pre-trained generalist policy that works across four robot embodiments:
-* **Carter** (wheeled robot)
-* **H1** (humanoid)
-* **G1** (humanoid)
-* **Spot** (quadruped)
-
-To try out the pre-trained generalist policy:
-1. Download the checkpoint from: https://huggingface.co/nvidia/COMPASS/blob/main/compass_generalist.ckpt
-2. Use the evaluation command shown above with your downloaded checkpoint:
-   ```bash
-   ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
-       -c configs/eval_config.gin \
-       -o <output_dir> \
-       -b <path/to/x_mobility_ckpt> \
-       -d <path/to/downloaded_generalist_policy_ckpt> \
-       --enable_camera \
-       --embodiment <embodiment_name> \
-       --environment <environment_name>
-   ```
-
-> **NOTE**: The generalist policy uses one-hot embodiment encoding and may not generalize perfectly to unseen embodiment types. For best results with new embodiment types, we recommend fine-tuning with residual RL first.
-
 
 ## ROS2 Deployment
 To deploy COMPASS in Isaac Sim or on real robots using ROS2, please follow the detailed instructions in [ros2_deployment/README.md](ros2_deployment/README.md). This guide covers containerized workflows, and Isaac Sim integration.

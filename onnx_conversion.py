@@ -58,8 +58,11 @@ class PolicyInference(nn.Module):
         return base_action, base_policy_state, history, sample
 
     def compose_policy_state(self, base_policy_state, goal_heading):
-        goal_heading_encoding = self._encode_goal_heading(goal_heading)
-        return torch.cat([base_policy_state, goal_heading_encoding], dim=1)
+        if goal_heading is not None:
+            goal_heading_encoding = self._encode_goal_heading(goal_heading)
+            return torch.cat([base_policy_state, goal_heading_encoding], dim=1)
+        else:
+            return base_policy_state
 
     def _encode_goal_heading(self, goal_heading):
         return torch.cat([torch.cos(goal_heading), torch.sin(goal_heading)], dim=1)
@@ -79,7 +82,14 @@ class SpecialistPolicyInference(PolicyInference):
         self.residual_policy.load_state_dict(
             torch.load(residual_checkpoint_path, weights_only=False)['model_state_dict'])
 
-    def forward(self, image, route, goal_heading, speed, action_input, history_input, sample_input):
+    def forward(self,
+                image,
+                route,
+                speed,
+                action_input,
+                history_input,
+                sample_input,
+                goal_heading=None):
         # Run base policy.
         base_action, base_policy_state, history, sample = self.base_policy_forward(
             image, route, speed, action_input, history_input, sample_input)
@@ -105,10 +115,17 @@ class GeneralistPolicyInference(PolicyInference):
         self.generalist_policy = ESDistillationPolicyWrapper(generalist_policy_ckpt_path,
                                                              embodiment_type)
 
-    def forward(self, image, route, goal_heading, speed, action_input, history_input, sample_input):
+    def forward(self,
+                image,
+                route,
+                speed,
+                action_input,
+                history_input,
+                sample_input,
+                goal_heading=None):
         # Run base policy.
         _, base_policy_state, history, sample = self.base_policy_forward(
-            image, route, goal_heading, speed, action_input, history_input, sample_input)
+            image, route, speed, action_input, history_input, sample_input)
         # Add additional encodings to policy state.
         policy_state = self.compose_policy_state(base_policy_state, goal_heading)
 
@@ -125,7 +142,8 @@ def convert(base_checkpoint_path: str,
             embodiment_type: str,
             onnx_path: str,
             jit_path: str,
-            image_size: list = [1200, 1920]):
+            image_size: list = [1200, 1920],
+            disable_goal_heading: bool = False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if residual_checkpoint_path:
         model = SpecialistPolicyInference(base_checkpoint_path, residual_checkpoint_path)
@@ -142,28 +160,36 @@ def convert(base_checkpoint_path: str,
     image = torch.randn((1, 1, 3, image_size[0], image_size[1]), dtype=torch.float32).to(device)
     speed = torch.randn((1, 1, 1), dtype=torch.float32).to(device)
     action = torch.randn((1, 6), dtype=torch.float32).to(device)
-    goal_heading = torch.randn((1, 1), dtype=torch.float32).to(device)
     history = torch.zeros((1, 1024), dtype=torch.float32).to(device)
     sample = torch.zeros((1, 512), dtype=torch.float32).to(device)
     route = torch.randn((1, 1, 10, 4), dtype=torch.float32).to(device)
 
+    # Prepare input tuple for ONNX export
+    if not disable_goal_heading:
+        goal_heading = torch.randn((1, 1), dtype=torch.float32).to(device)
+        input_tuple = (image, route, speed, action, history, sample, goal_heading)
+        input_names = [
+            'image', 'route', 'speed', 'action_input', 'history_input', 'sample_input',
+            'goal_heading'
+        ]
+    else:
+        input_tuple = (image, route, speed, action, history, sample)
+        input_names = ['image', 'route', 'speed', 'action_input', 'history_input', 'sample_input']
+
     # Output jit file.
     if jit_path:
-        traced_model = torch.jit.trace(model,
-                                       (image, route, goal_heading, speed, action, history, sample))
+        traced_model = torch.jit.trace(model, input_tuple)
         traced_model.save(jit_path)
 
     # Output names.
     output_names = ['action_output', 'history_output', 'sample_output']
 
     # ONNX conversion.
-    torch.onnx.export(model, (image, route, goal_heading, speed, action, history, sample),
+    torch.onnx.export(model,
+                      input_tuple,
                       onnx_path,
                       verbose=True,
-                      input_names=[
-                          'image', 'route', 'goal_heading', 'speed', 'action_input',
-                          'history_input', 'sample_input'
-                      ],
+                      input_names=input_names,
                       output_names=output_names)
 
 
@@ -211,7 +237,9 @@ def main():
                         nargs=2,
                         default=[1200, 1920],
                         help='The input image size as [height, width].')
-
+    parser.add_argument('--disable-goal-heading',
+                        action='store_true',
+                        help='Disable goal_heading input. If set, goal_heading will be disabled.')
     args = parser.parse_args()
 
     # Load hyperparameters.
@@ -220,7 +248,8 @@ def main():
     # Run the convert.
     print("Converting ONNX.")
     convert(args.base_ckpt_path, args.residual_ckpt_path, args.generalist_ckpt_path,
-            args.embodiment_type, args.onnx_file, args.jit_file, args.image_size)
+            args.embodiment_type, args.onnx_file, args.jit_file, args.image_size,
+            args.disable_goal_heading)
 
     # Upload onnx to wandb if onnx_artifact is provided.
     if args.onnx_artifact:
