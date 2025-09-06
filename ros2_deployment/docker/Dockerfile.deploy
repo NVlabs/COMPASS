@@ -82,9 +82,6 @@ RUN rosdep init && rosdep update
 # Install TensorRT through NVIDIA apt repository
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update && apt-get install -y --no-install-recommends \
-    tensorrt \
-    python3-libnvinfer \
-    python3-libnvinfer-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set CUDA 11.8 environment variables
@@ -115,7 +112,10 @@ RUN --mount=type=cache,target=/home/compassuser/.cache/pip \
     onnxruntime-gpu \
     transformations \
     onnx \
-    pycuda
+    pycuda \
+    tensorrt-cu11 \
+    tensorrt-lean-cu11 \
+    tensorrt-dispatch-cu11
 
 # Copy and install compass requirements
 COPY --chown=compassuser:compassuser requirements.txt /tmp/requirements.txt
