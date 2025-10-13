@@ -1,0 +1,54 @@
+services:
+  isaac-sim:
+    image: nvcr.io/nvidia/isaac-sim:4.5.0
+    container_name: isaac-sim
+    stdin_open: true
+    tty: true
+
+    # GPU configuration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    runtime: nvidia
+
+    # Network configuration for ROS2 communication
+    network_mode: host
+
+    # Environment variables
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ACCEPT_EULA=Y
+      - PRIVACY_CONSENT=Y
+      - OMNI_KIT_ALLOW_ROOT=1
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/root/.ros/fastdds.xml
+      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.bridge/humble/lib
+      # ROS2 environment variables (set by compass_container.py)
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+    # Volume mounts
+    volumes:
+      # X11 forwarding for GUI
+      - /tmp/.X11-unix:/tmp/.X11-unix
+
+      # Isaac Sim cache volumes - matches original docker run command exactly
+      - ${HOME}/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
+      - ${HOME}/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
+      - ${HOME}/docker/isaac-sim/cache/pip:/root/.cache/pip:rw
+      - ${HOME}/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
+      - ${HOME}/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
+      - ${HOME}/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
+      - ${HOME}/docker/isaac-sim/data:/root/.local/share/ov/data:rw
+      - ${HOME}/docker/isaac-sim/documents:/root/Documents:rw
+
+      # Additional mount to prevent .ros directory pollution (the main missing piece)
+      - ${HOME}/docker/isaac-sim/ros:/root/.ros:rw
+
+    # Override entrypoint to launch Isaac Sim with ROS2 bridge
+    entrypoint: ["/bin/bash"]
+    command: ["-c", "cd /isaac-sim && ./isaac-sim.sh --enable omni.isaac.ros2_bridge"]

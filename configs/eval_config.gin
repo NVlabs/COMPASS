@@ -1,0 +1,10 @@
+include 'configs/shared.gin'
+include 'configs/distillation_config.gin'
+
+run.num_iterations=10
+run.num_envs=64
+run.run_mode='eval'
+run.seed = 10
+
+# Residual PPO Trainer
+ResidualPPOTrainer.debug_viz=True
