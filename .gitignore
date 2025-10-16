@@ -1,0 +1,38 @@
+bazel*
+cscope.*
+*.swp
+*.sublime-project
+*.sublime-workspace
+*.pyc
+imgui.ini
+.dazel_run
+venv/
+.clangd/
+
+# Local setups
+**/_isaac_sim
+
+# Build files
+*build
+*install
+*log
+
+# Protofiles
+*.pb*
+
+# Data files
+*.pkl
+
+#Jupter notebook
+*.ipynb_checkpoints/
+
+# USD files
+compass/rl_env/exts/mobility_es/mobility_es/usd/
+compass/rl_env/exts/mobility_es/mobility_es.egg-info/
+
+# Model files and cache
+ros2_deployment/assets/
+*.ckpt
+*.onnx
+*.engine
+*.trt
