@@ -31,7 +31,7 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
 🚀 **Get started in 3 steps:**
 1. [Install Isaac Lab and dependencies](#installation)
 2. [Train your own specialists or deploy on robots](#usage)
-3. [Data generation for GROOT post-training](#groot-post-training-with-compass-distillation-datasets)
+3. [Data generation for GR00T post-training](#gr00t-post-training-with-compass-datasets)
 
 ## Installation
 
@@ -219,29 +219,29 @@ The training and evaluation scripts use TensorBoard for logging by default. Weig
 </details>
 
 
-## GROOT Post-training with COMPASS Datasets
+## GR00T Post-training with COMPASS Datasets
 
-The COMPASS distillation datasets can also be used to train VLA models like [GROOT](https://github.com/NVIDIA/Isaac-GR00T), to enhance their navigation capabilities.
+The COMPASS distillation datasets can also be used to train VLA models like [GR00T](https://github.com/NVIDIA/Isaac-GR00T), to enhance their navigation capabilities.
 
 <details>
-<summary><strong>🤖 GROOT Post-training Steps</strong> (click to expand)</summary>
+<summary><strong>🤖 GR00T Post-training Steps</strong> (click to expand)</summary>
 
-**Step 1: Collect the datasets and convert to GROOT Lerobot format**
+**Step 1: Collect the datasets and convert to GR00T Lerobot format**
 
 Follow the steps described above in the "🤖 Training Residual RL Specialists" and "🧠 Policy Distillation" sections to train a specialist policy and generate the corresponding specialist datasets.
 
-Use the following command to convert the distillation dataset from HDF5 to the GROOT Lerobot episodic format:
+Use the following command to convert the distillation dataset from HDF5 to the GR00T Lerobot episodic format:
   ```bash
   python scripts/hdf5_to_lerobot_episodic.py --hdf5-dir <path/to/hdf5/directory> --output-path <path/to/lerobot/format>
   ```
 
-**Step 2: Post-train the GROOT model**
+**Step 2: Post-train the GR00T model**
 
-Once the dataset is converted, follow the post-training [instructions](https://github.com/NVIDIA/Isaac-GR00T/tree/main/getting_started) provided in the GROOT repo. A ready-to-use navigation data configuration for post-training is available in this [branch](https://github.com/NVIDIA/Isaac-GR00T/compare/main...liuw/nav_fine_tune).
+Once the dataset is converted, follow the post-training [instructions](https://github.com/NVIDIA/Isaac-GR00T/tree/main/getting_started) provided in the GR00T repo. A ready-to-use navigation data configuration for post-training is available in this [branch](https://github.com/NVIDIA/Isaac-GR00T/compare/main...liuw/nav_fine_tune).
 
-**Step 3: Evaluate the post-trained GROOT model**
+**Step 3: Evaluate the post-trained GR00T model**
 
-To evaluate the post-trained GROOT model, first launch the inference server from within the GROOT repository by following the setup instructions provided there. Ensure that the data configuration matches the one used during training, and the port number is set as 8888.
+To evaluate the post-trained GR00T model, first launch the inference server from within the GR00T repository by following the setup instructions provided there. Ensure that the data configuration matches the one used during training, and the port number is set as 8888.
 
 Once the server is running, start the COMPASS evaluation with the following command:
 ```bash
@@ -250,7 +250,7 @@ ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
     -o <output_dir> \
     -b <path/to/x_mobility_ckpt> \
     --enable_camera \
-    --groot-policy
+    --gr00t-policy
 ```
 You can modify the evaluation parameters in the eval_config.gin file as needed.
 

@@ -25,7 +25,7 @@ from compass.residual_rl.constants import INPUT_IMAGE_SIZE
 from compass.residual_rl.actor_critic import ActorCriticXMobility
 from compass.residual_rl.critic_state_assembler import CriticObservationEncoder
 from compass.residual_rl.ppo import PPO
-from compass.residual_rl.groot_service import ExternalRobotInferenceClient
+from compass.residual_rl.gr00t_service import ExternalRobotInferenceClient
 
 
 @gin.configurable
@@ -66,7 +66,7 @@ class ResidualPPOTrainer:
                                                              policy_state_dim=self.policy_state_dim)
         self.critic_state_dim = self.critic_state_assembler.state_dim
 
-        self.groot_client = ExternalRobotInferenceClient(host="0.0.0.0", port=8888)
+        self.gr00t_client = ExternalRobotInferenceClient(host="0.0.0.0", port=8888)
 
         # Init actor critic.
         self.action_dim = 6
@@ -107,7 +107,7 @@ class ResidualPPOTrainer:
         policy_state = torch.cat([policy_state, obs_dict['policy']['goal_heading']], dim=1)
         return policy_state, base_actions, history, sample, extras
 
-    def groot_policy_process(self, obs_dict):
+    def gr00t_policy_process(self, obs_dict):
         b = obs_dict['policy']['camera_rgb_img'].shape[0]
         device = obs_dict['policy']['camera_rgb_img'].device
         rgb = obs_dict['policy']['camera_rgb_img'].reshape(b, 1, INPUT_IMAGE_SIZE[0],
@@ -124,7 +124,7 @@ class ResidualPPOTrainer:
             "state.goal_heading":
                 obs_dict['policy']['goal_heading'].reshape(b, 1, 2).cpu().numpy(),
         }
-        outputs = self.groot_client.get_action(observations)
+        outputs = self.gr00t_client.get_action(observations)
         action_tensor = torch.from_numpy(outputs['action.vel_cmd'][:, 0]).to(device=device,
                                                                              dtype=torch.float32)
         # Create zero tensor
@@ -235,7 +235,7 @@ class ResidualPPOTrainer:
         self._save_ckpt(os.path.join(self.output_dir,
                                      f"model_{self.current_learning_iteration}.pt"))
 
-    def eval(self, num_eval_iterations, distillation_policy=None, groot_policy=False):
+    def eval(self, num_eval_iterations, distillation_policy=None, gr00t_policy=False):
         goal_reached_sum = 0
         fall_down_sum = 0
         travel_step_sum = 0
@@ -255,8 +255,8 @@ class ResidualPPOTrainer:
                 travel_step = torch.zeros_like(obs_dict['eval']['goal_reached'], dtype=torch.int32)
                 for step in tqdm(range(self.num_steps_per_env)):
                     # Get final actions.
-                    if groot_policy:
-                        final_actions = self.groot_policy_process(obs_dict)
+                    if gr00t_policy:
+                        final_actions = self.gr00t_policy_process(obs_dict)
                     elif distillation_policy:
                         final_actions = distillation_policy(policy_state)
                     else:
@@ -276,7 +276,7 @@ class ResidualPPOTrainer:
 
                     # Visualize actions.
                     if self.debug_viz:
-                        if distillation_policy or groot_policy:
+                        if distillation_policy or gr00t_policy:
                             self.env.unwrapped.action_manager.get_term('drive_joints').visualize(
                                 final_actions, torch.zeros_like(final_actions))
                         else:

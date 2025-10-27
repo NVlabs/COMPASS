@@ -43,10 +43,10 @@ parser.add_argument('--checkpoint-path',
                     type=str,
                     default=None,
                     help='The path to the checkpoint.')
-parser.add_argument('--groot-policy',
+parser.add_argument('--gr00t-policy',
                     action='store_true',
                     default=False,
-                    help='Use Groot policy for evaluation.')
+                    help='Use gr00t policy for evaluation.')
 parser.add_argument('--logger',
                     type=str,
                     choices=['wandb', 'tensorboard'],
@@ -249,7 +249,7 @@ def run(run_mode,
     elif run_mode == 'eval':
         if args_cli.checkpoint_path:
             rl_trainer.load(path=args_cli.checkpoint_path, load_optimizer=False)
-        rl_trainer.eval(num_iterations, distillation_policy, args_cli.groot_policy)
+        rl_trainer.eval(num_iterations, distillation_policy, args_cli.gr00t_policy)
     elif run_mode == 'record':
         metadata = {
             'embodiment': embodiment,
