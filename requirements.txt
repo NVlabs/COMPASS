@@ -4,6 +4,7 @@ gin-config
 h5py
 matplotlib
 moviepy
+msgpack
 numpy
 onnx
 onnxruntime-gpu
@@ -14,3 +15,4 @@ torcheval
 transformers
 wandb
 wheel
+zmq
