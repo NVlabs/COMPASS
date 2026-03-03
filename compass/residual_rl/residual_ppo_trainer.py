@@ -1,23 +1,18 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import os
+from datetime import datetime
 
 import numpy as np
 import h5py
 import gin
+import matplotlib.pyplot as plt
 import torch
 from tqdm import tqdm
 
@@ -41,7 +36,9 @@ class ResidualPPOTrainer:
                  device='cpu',
                  num_steps_per_env=100,
                  ckpt_save_interval=50,
-                 debug_viz=False):
+                 debug_viz=False,
+                 max_debug_images=2,
+                 debug_image_interval=10):
         # Prepare log directory.
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -88,6 +85,18 @@ class ResidualPPOTrainer:
         self.ckpt_save_interval = ckpt_save_interval
         self.current_learning_iteration = 0
         self.debug_viz = debug_viz
+
+        # Init debug images directory and counter
+        self.debug_images_dir = os.path.join(output_dir, 'debug_images')
+        if not os.path.exists(self.debug_images_dir):
+            os.makedirs(self.debug_images_dir)
+        self.image_counter = 0
+        # Maximum number of grid images to save (None/0 = Skip saving images)
+        # each grid is comprised of 8 images, and so for 64 envs, there would be
+        # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
+        self.max_debug_images = max_debug_images
+        # Save images every `debug_image_interval` iterations
+        self.debug_image_interval = debug_image_interval
 
         self.env.reset()
 
@@ -178,6 +187,8 @@ class ResidualPPOTrainer:
                     # Run env step.
                     obs_dict, rewards, dones, truncateds, infos = self.env.step(
                         final_actions.float())
+
+                    self._save_debug_images(obs_dict, it, _)
 
                     # Move time out information to the extras dict
                     # this is only needed for infinite horizon tasks
@@ -409,3 +420,160 @@ class ResidualPPOTrainer:
 
     def eval_mode(self):
         self.alg.actor_critic.eval()
+
+    def _save_debug_images(self, obs_dict, iteration, step):
+        """Save debug images from all cameras as multiple grids for 1 step during training."""
+        try:
+            if self.max_debug_images is None or self.max_debug_images == 0:
+                return
+
+            if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
+                return
+
+            # Only save images for the first step to avoid too many files
+            if step != 0:
+                return
+
+            # Only save images at specified iteration intervals
+            if iteration % self.debug_image_interval != 0:
+                return
+
+            camera_rgb = obs_dict["policy"]["camera_rgb_img"]
+            batch_size = camera_rgb.shape[0]
+
+            # Convert tensors to numpy
+            rgb_images_np = camera_rgb.detach().cpu().numpy()
+
+            # Get depth images if available
+            depth_images_np = None
+            if "privileged" in obs_dict and "camera_depth_img" in obs_dict["privileged"]:
+                depth_images = obs_dict["privileged"]["camera_depth_img"]
+                depth_images_np = depth_images.detach().cpu().numpy()
+
+            # Process environments in batches of 8 to create multiple grids
+            envs_per_grid = 8
+            num_grids = (batch_size + envs_per_grid - 1) // envs_per_grid    # Ceiling division
+
+            # Limit the number of grids if max_debug_images is set
+            if self.max_debug_images is not None:
+                num_grids = min(num_grids, self.max_debug_images)
+
+            for grid_idx in range(num_grids):
+                start_env = grid_idx * envs_per_grid
+                end_env = min(start_env + envs_per_grid, batch_size)
+
+                # Prepare images for this grid
+                grid_images = []
+                subtitles = []
+
+                for env_idx in range(start_env, end_env):
+                    # Process RGB image
+                    rgb_img = rgb_images_np[env_idx]
+
+                    # Reshape if flattened
+                    if len(rgb_img.shape) == 1:
+                        height, width = INPUT_IMAGE_SIZE[0], INPUT_IMAGE_SIZE[1]
+                        channels = 3
+                        rgb_img = rgb_img.reshape(height, width, channels)
+
+                    # Denormalize RGB from [0, 1] to [0, 255] if needed
+                    if rgb_img.max() <= 1.0:
+                        rgb_img = (rgb_img * 255).astype(np.uint8)
+                    else:
+                        rgb_img = rgb_img.astype(np.uint8)
+
+                    grid_images.append(rgb_img)
+                    subtitles.append(f"RGB Env {env_idx}")
+
+                    # Process depth image if available
+                    if depth_images_np is not None:
+                        depth_img = depth_images_np[env_idx]
+
+                        # Reshape if flattened
+                        if len(depth_img.shape) == 1:
+                            height, width = INPUT_IMAGE_SIZE[0], INPUT_IMAGE_SIZE[1]
+                            depth_img = depth_img.reshape(height, width)
+
+                        # Normalize depth for visualization (0-255)
+                        # Handle NaN and infinity values
+                        depth_img_clean = np.nan_to_num(depth_img, nan=0.0, posinf=0.0, neginf=0.0)
+                        depth_max = depth_img_clean.max()
+                        depth_min = depth_img_clean.min()
+
+                        if depth_max > depth_min and depth_max > 0:
+                            # Normalize to 0-255 range
+                            depth_img_norm = ((depth_img_clean - depth_min) /
+                                              (depth_max - depth_min) * 255).astype(np.uint8)
+                        else:
+                            depth_img_norm = np.zeros_like(depth_img_clean, dtype=np.uint8)
+
+                        # Convert to 3-channel for consistency
+                        depth_img_3ch = np.stack([depth_img_norm] * 3, axis=-1)
+
+                        grid_images.append(depth_img_3ch)
+                        subtitles.append(f"Depth Env {env_idx}")
+
+                # Create grid layout and log to wandb
+                if len(grid_images) > 0:
+                    grid_image_path = self._create_image_grid(grid_images, subtitles, iteration,
+                                                              step, grid_idx)
+
+                    # Log the image to wandb using the logger with grid index in name
+                    if grid_image_path is not None:
+                        self.logger.log_image(name=f"debug/camera_grid_{grid_idx}",
+                                              image_path=grid_image_path,
+                                              step=iteration)
+
+        except (KeyError, IOError, OSError, ValueError, RuntimeError, AttributeError) as e:
+            print(f"Warning: Failed to save debug images: {e}")
+
+    def _create_image_grid(self, images, subtitles, iteration, step, grid_idx=0):
+        """Create and save a grid of images. Returns the filepath of the saved image."""
+
+        num_images = len(images)
+        if num_images == 0:
+            return None
+
+        # Calculate grid dimensions (prefer wider grids)
+        if num_images <= 4:
+            rows, cols = 1, num_images
+        elif num_images <= 8:
+            rows, cols = 2, 4
+        elif num_images <= 12:
+            rows, cols = 3, 4
+        else:
+            rows, cols = 4, 4
+
+        # Create figure
+        fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+        if rows == 1 and cols == 1:
+            axes = [axes]
+        elif rows == 1 or cols == 1:
+            axes = axes.flatten()
+        else:
+            axes = axes.flatten()
+
+        # Plot images
+        for i, (img, subtitle) in enumerate(zip(images, subtitles)):
+            if i < len(axes):
+                axes[i].imshow(img)
+                axes[i].set_title(subtitle, fontsize=10)
+                axes[i].axis('off')
+
+        # Hide unused subplots
+        for i in range(len(images), len(axes)):
+            axes[i].axis('off')
+
+        # Add overall title
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        fig.suptitle(f"Camera Views Grid {grid_idx} - Iter {iteration:04d} Step {step:04d}",
+                     fontsize=14)
+
+        # Save the grid
+        filename = f"camera_grid_{grid_idx}_iter_{iteration:04d}_step_{step:04d}_{timestamp}.jpg"
+        filepath = os.path.join(self.debug_images_dir, filename)
+        plt.tight_layout()
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        return filepath

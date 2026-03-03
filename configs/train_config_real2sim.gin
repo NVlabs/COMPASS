@@ -1,0 +1,20 @@
+include 'configs/shared.gin'
+
+run.num_iterations=1000
+run.num_envs=64
+run.run_mode='train'
+run.seed = 20
+
+# Collision checking distances (in meters)
+# Goal pose collision distance - safety margin when checking if sampled
+# goal poses are collision-free
+run.goal_pose_collision_distance = 0.5
+# Start pose collision distance - safety margin when checking if sampled
+# robot start poses are collision-free
+run.start_pose_collision_distance = 0.5
+
+# Precompute valid start and goal poses using occupancy map and collision distance.
+# This helps when the sim or real2sim nurec assets have small regions where it can
+# be swpaned or navigate, and random sampling might not generate those valid positions
+# in given iteration count.
+run.precompute_valid_poses = True

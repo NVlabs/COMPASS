@@ -1,17 +1,10 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 from __future__ import annotations
 
@@ -48,7 +41,9 @@ class SceneCfg(InteractiveSceneCfg):
     """Common environment configuration with the nova ."""
 
     # Ground terrain
-    terrain = scene_assets.terrain
+    # Set to None to disable terrain.
+    # Note: Nurec Real2Sim assets mostly come with a default ground terrain.
+    # terrain = scene_assets.terrain
 
     # Environment.
     environment = environments.simple_office
@@ -165,7 +160,7 @@ class CommandsCfg:
     goal_pose = commands_cfg.UniformCollisionFreePose2dCommandCfg(
         asset_name="robot",
         resampling_time_range=(EPISODE_LENGTH_S, EPISODE_LENGTH_S),
-        debug_vis=False,
+        debug_vis=True,
         simple_heading=False,
         ranges=commands_cfg.UniformCollisionFreePose2dCommandCfg.Ranges(
             pos_x=(-5, 5),
@@ -207,6 +202,8 @@ class EventCfg:
                 "pitch": (0.0, 0.0),
                 "yaw": (0.0, 0.0),
             },
+    # Default collision distance for start pose sampling
+            "collision_distance": 0.75,
         },
     )
 

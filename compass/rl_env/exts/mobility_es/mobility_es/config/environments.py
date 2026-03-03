@@ -1,17 +1,10 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import os
 
@@ -42,6 +35,8 @@ USD_PATHS = {
                      "../usd/simple_warehouse_no_roof/simple_warehouse_no_roof.usd"),
     'Hospital':
         f'{ISAAC_NUCLEUS_DIR}/Environments/Hospital/hospital.usd',
+    'Real2Sim_Galileo':
+        os.path.join(os.path.dirname(__file__), "../usd/real2sim_galileo/real2sim_galileo.usd"),
 }
 
 OMAP_PATHS = {
@@ -61,6 +56,8 @@ OMAP_PATHS = {
         os.path.join(os.path.dirname(__file__), "../usd/office/omap/occupancy_map.yaml"),
     'Hospital':
         os.path.join(os.path.dirname(__file__), "../usd/hospital/omap/occupancy_map.yaml"),
+    'Real2Sim_Galileo':
+        os.path.join(os.path.dirname(__file__), "../usd/real2sim_galileo/omap/occupancy_map.yaml"),
 }
 
 
@@ -246,4 +243,27 @@ random_envs = EnvSceneAssetCfg(
         ),
     ),
     replicate_physics=False,
+)
+
+real2sim_galileo = EnvSceneAssetCfg(
+    prim_path="{ENV_REGEX_NS}/Real2Sim_Galileo",
+    init_state=AssetBaseCfg.InitialStateCfg(
+        pos=(0, 0, 0.01),
+        rot=(1.0, 0.0, 0.0, 0.0),
+    ),
+    spawn=sim_utils.UsdFileCfg(
+        usd_path=USD_PATHS['Real2Sim_Galileo'],
+        scale=(1.0, 1.0, 1.0),
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=None,
+            solver_position_iteration_count=4,
+            solver_velocity_iteration_count=1,
+        ),
+    ),
+    pose_sample_range={
+        "x": (-4.5, 3.8),
+        "y": (0, 5),
+        "yaw": (-3.14, 3.14)
+    },
+    env_spacing=500,
 )

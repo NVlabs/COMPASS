@@ -62,7 +62,7 @@ carter = ArticulationCfg(
                     "joint_caster_left",
                     "joint_caster_right",
                 ],
-                velocity_limit=1000,
+                velocity_limit_sim=360,
                 stiffness=0.0,
                 damping=0.0,
             ),

@@ -34,6 +34,11 @@ class UniformCollisionFreePose2dCommandCfg(commands.UniformPose2dCommandCfg):
     # Probability of applying minimum distance sampling.
     minimum_distance_prob: float = None
 
+    # Collision check distance threshold (in meters).
+    # This parameter controls the safety margin used when checking if a
+    # sampled goal pose is collision-free.
+    collision_distance: float = 0.25
+
     goal_pose_visualizer_cfg = GREEN_ARROW_X_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose_goal")
 

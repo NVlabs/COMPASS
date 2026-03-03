@@ -1,18 +1,3 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
 Flexible logging system that supports both Weights & Biases and TensorBoard.
 """
@@ -70,6 +55,25 @@ class Logger:
                              "Choose either 'wandb' or 'tensorboard'.")
 
         print(f"Logger initialized with backend: {self.backend}")
+
+    def log_image(self, name: str, image_path: str, step: Optional[int] = None):
+        """
+        Log an image.
+
+        Args:
+            name: Name of the image
+            image_path: Path to the image file
+            step: Step number (if None, uses 0)
+        """
+        if step is None:
+            step = 0
+
+        if self.backend == "wandb":
+            wandb.log({name: wandb.Image(image_path, caption=f"Iteration {step}")}, step=step)
+        else:
+            # For TensorBoard, we would need to read the image and convert it
+            # For now, just note that it's not fully implemented
+            print(f"Image logging to TensorBoard not fully implemented. Image '{name}' not logged.")
 
     def log_video(self, name: str, video_path: str, fps: int = 4, step: Optional[int] = None):
         """
