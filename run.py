@@ -19,47 +19,6 @@ import argparse
 import os
 import gymnasium as gym
 
-# # Patch inspect.getfile and getmodule EARLY to handle namespace packages (isaaclab)
-# # This must be done before importing isaaclab or wandb to prevent TypeError
-# import inspect
-
-# # Store original functions
-# _original_getfile = inspect.getfile
-# _original_getmodule = inspect.getmodule
-
-
-# def _patched_getfile(obj):
-#     try:
-#         return _original_getfile(obj)
-#     except TypeError as e:
-#         error_msg = str(e)
-#         # Handle namespace packages that raise "is a built-in module" error
-#         if "is a built-in module" in error_msg:
-#             # Check if it's a namespace package (like isaaclab)
-#             if hasattr(obj, '__name__'):
-#                 module_name = obj.__name__
-#                 # Check if it's a namespace package by looking for NamespaceLoader
-#                 if hasattr(obj, '__loader__') and 'NamespaceLoader' in str(type(obj.__loader__)):
-#                     # Return a placeholder path for namespace packages
-#                     return f'<namespace package: {module_name}>'
-#         raise e
-
-
-# def _patched_getmodule(obj, _filename=None):
-#     try:
-#         return _original_getmodule(obj, _filename)
-#     except TypeError:
-#         # If getmodule fails, check if it's a namespace package
-#         if hasattr(obj, '__name__') and hasattr(obj, '__loader__'):
-#             if 'NamespaceLoader' in str(type(obj.__loader__)):
-#                 return obj
-#         raise
-
-
-# # Apply patches BEFORE any other imports that might use inspect
-# inspect.getfile = _patched_getfile
-# inspect.getmodule = _patched_getmodule
-
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
