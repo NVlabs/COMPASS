@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 
 from isaaclab.assets import RigidObject
 from isaaclab.managers import SceneEntityCfg
@@ -37,8 +38,8 @@ def goal_reached(
     robot: RigidObject = env.scene[robot_cfg.name]
 
     # Check if the robot velocity is below the threshold
-    root_linear_vel = torch.norm(robot.data.root_lin_vel_w, dim=1)
-    root_angular_vel = robot.data.root_ang_vel_w[:, 2].abs()
+    root_linear_vel = torch.norm(wp.to_torch(robot.data.root_lin_vel_w), dim=1)
+    root_angular_vel = wp.to_torch(robot.data.root_ang_vel_w)[:, 2].abs()
     vel_threshold = torch.logical_and(root_linear_vel < linear_vel_threshold,
                                       root_angular_vel < angular_vel_threshold)
 
@@ -56,6 +57,6 @@ def goal_reached(
 
 def nan_pose(env: RLESEnvWrapper, robot_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
     # Check if the robot pose is nan, which can happen when the robot explodes in simulation.
-    nan_pos = torch.isnan(env.scene[robot_cfg.name].data.root_pos_w)
-    nan_quat = torch.isnan(env.scene[robot_cfg.name].data.root_quat_w)
+    nan_pos = torch.isnan(wp.to_torch(env.scene[robot_cfg.name].data.root_pos_w))
+    nan_quat = torch.isnan(wp.to_torch(env.scene[robot_cfg.name].data.root_quat_w))
     return torch.logical_or(torch.any(nan_pos, dim=1), torch.any(nan_quat, dim=1))

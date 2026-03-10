@@ -43,6 +43,6 @@ camera = TiledCameraCfg(
                                      horizontal_aperture=20.955,
                                      clipping_range=(0.1, 20.0)),
     offset=CameraCfg.OffsetCfg(pos=(0.10434, 0.0, 0.37439),
-                               rot=(0.5, -0.5, 0.5, -0.5),
+                               rot=(-0.5, 0.5, -0.5, 0.5),
                                convention="ros"),
 )

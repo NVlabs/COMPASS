@@ -80,10 +80,28 @@ parser.add_argument("--video_interval",
                     type=int,
                     default=10,
                     help="Interval between video recordings (in iterations).")
+parser.add_argument("--camera_sensor_name",
+                    type=str,
+                    default="camera",
+                    help="Name of the onboard camera sensor in env.scene.sensors "
+                         "used for robot-camera video recording (default: 'camera').")
 # Optional parameters to override gin config.
 parser.add_argument('--embodiment', type=str, help='Embodiment type')
 parser.add_argument('--environment', type=str, help='Environment type')
 parser.add_argument('--num_envs', type=int, help='Number of environments')
+parser.add_argument('--precompute_valid_poses',
+                    action='store_true',
+                    default=False,
+                    help='Precompute valid pose locations for faster sampling')
+parser.add_argument('--precompute_valid_orientations',
+                    action='store_true',
+                    default=False,
+                    help='Precompute valid orientations for each pose location. '
+                         'If False, uses randomly generated orientations.')
+parser.add_argument('--disable_terrain',
+                    action='store_true',
+                    default=False,
+                    help='Disable terrain (set terrain to None).')
 
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -111,6 +129,7 @@ from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
 from compass.distillation.distillation import ESDistillationPolicyWrapper
 from compass.residual_rl.residual_ppo_trainer import ResidualPPOTrainer
 from compass.utils.logger import Logger
+from compass.utils.multi_camera_video_recorder import MultiCameraVideoRecorder
 
 # Map from the embedding type to the RL env config.
 EmbodimentEnvCfgMap = {
@@ -130,7 +149,7 @@ EnvSceneAssetCfgMap = {
     'combined_multi_rack': environments.combined_multi_rack,
     'random_envs': environments.random_envs,
     'hospital': environments.hospital,
-    'warehouse_multi_rack': environments.warehouse_multi_rack
+    'nova_carter_galileo_nurec': environments.nova_carter_galileo_nurec,
 }
 
 
@@ -154,7 +173,12 @@ def run(run_mode,
         num_iterations,
         num_steps_per_iteration,
         seed,
-        enable_curriculum=False):
+        enable_curriculum=False,
+        goal_pose_collision_distance=0.5,
+        start_pose_collision_distance=0.75,
+        precompute_valid_poses=False,
+        precompute_valid_orientations=False,
+        disable_terrain=False):
 
     # Setup logger.
     logger = Logger(log_dir=args_cli.output_dir,
@@ -197,6 +221,10 @@ def run(run_mode,
     env_cfg.scene.num_envs = num_envs
     env_cfg.events.reset_base.params["pose_range"] = env_cfg.scene.environment.pose_sample_range
 
+    # Setup terrain (disable if requested)
+    if disable_terrain or args_cli.disable_terrain:
+        env_cfg.scene.terrain = None
+
     # Setup the curriculum
     if enable_curriculum:
         env_cfg.curriculum.command_min_distance_prob.params[
@@ -214,12 +242,35 @@ def run(run_mode,
     # Setup seed
     env_cfg.seed = seed
 
+    # Set collision distances and max resample trial from gin config
+    env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+
+    # Set collision distances and max resample trial from gin config
+    env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+
     # Disable rewards, termination and curriculum for eval.
     if run_mode == 'eval' or run_mode == 'record':
         env_cfg.rewards = None
         env_cfg.terminations = None
         env_cfg.curriculum = None
-    env = RLESEnvWrapper(cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+
+    # Use CLI flag if provided, otherwise use gin config
+    precompute_flag = args_cli.precompute_valid_poses or precompute_valid_poses
+    precompute_orientations_flag = args_cli.precompute_valid_orientations or precompute_valid_orientations
+    env = RLESEnvWrapper(cfg=env_cfg,
+                         render_mode="rgb_array" if args_cli.video else None,
+                         precompute_valid_poses=precompute_flag,
+                         precompute_valid_orientations=precompute_orientations_flag)
+
+    # Precompute valid pose locations if requested
+    if precompute_flag and env.collision_checker.is_initialized():
+        print("Precomputing valid pose locations...")
+        env.collision_checker.precompute_valid_poses(
+            start_collision_distance=start_pose_collision_distance,
+            goal_collision_distance=goal_pose_collision_distance,
+            precompute_valid_orientations=precompute_orientations_flag)
 
     # Setup video if enabled.
     if args_cli.video:
@@ -232,8 +283,13 @@ def run(run_mode,
                 num_steps_per_iteration,
             "disable_logger":
                 True,
+            "camera_sensor_name":
+                args_cli.camera_sensor_name,
         }
-        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+        # MultiCameraVideoRecorder wraps the viewport stream with gymnasium's
+        # RecordVideo internally and additionally records the onboard robot
+        # camera sensor to a separate "robot_camera/" sub-folder.
+        env = MultiCameraVideoRecorder(env, **video_kwargs)
 
     # Setup the agent.
     rl_trainer = ResidualPPOTrainer(env=env,
@@ -282,6 +338,12 @@ def main():
         gin.bind_parameter('run.environment', args_cli.environment)
     if args_cli.num_envs is not None:
         gin.bind_parameter('run.num_envs', args_cli.num_envs)
+    if args_cli.precompute_valid_poses:
+        gin.bind_parameter('run.precompute_valid_poses', True)
+    if args_cli.precompute_valid_orientations:
+        gin.bind_parameter('run.precompute_valid_orientations', True)
+    if args_cli.disable_terrain:
+        gin.bind_parameter('run.disable_terrain', True)
 
     # Run the training/evaluation/recording.
     run()

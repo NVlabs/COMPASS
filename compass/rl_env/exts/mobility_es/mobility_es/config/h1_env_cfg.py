@@ -50,7 +50,7 @@ class H1GoalReachingEnvCfg(GoalReachingEnvCfg):
         self.scene.camera = scene_assets.camera.replace(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link/front_cam")
         self.scene.camera.offset = CameraCfg.OffsetCfg(pos=(0.15, 0.0, 0.65),
-                                                       rot=(-0.2705, 0.6532, -0.6532, 0.2705981),
+                                                       rot=(0.6532, -0.6532, 0.2705981, -0.2705),
                                                        convention="ros")
 
         self.actions = H1ActionsCfg()

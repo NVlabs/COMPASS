@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 
 from isaaclab.assets import RigidObject
 from isaaclab.managers import SceneEntityCfg
@@ -31,7 +32,7 @@ def root_speed(
 ) -> torch.Tensor:
     """The speed of the root, which is the normalization of the linear velocity"""
     asset: RigidObject = env.scene[asset_cfg.name]
-    return torch.norm(asset.data.root_lin_vel_w, dim=1).unsqueeze(1)
+    return torch.norm(wp.to_torch(asset.data.root_lin_vel_w), dim=1).unsqueeze(1)
 
 
 def root_yaw_rate(
@@ -40,7 +41,7 @@ def root_yaw_rate(
 ) -> torch.Tensor:
     """The yaw rate of the root"""
     asset: RigidObject = env.scene[asset_cfg.name]
-    return asset.data.root_ang_vel_w[:, 2].unsqueeze(1)
+    return wp.to_torch(asset.data.root_ang_vel_w)[:, 2].unsqueeze(1)
 
 
 def camera_img(env: RLESEnvWrapper, data_type: str = "rgb"):
@@ -68,8 +69,8 @@ def camera_to_world(env: RLESEnvWrapper):
     batch_size = pos_w.shape[0]
     R_w_c = torch.zeros((batch_size, 3, 3), device=pos_w.device)
 
-    # Extract quaternion components
-    w, x, y, z = quat_w_world[:, 0], quat_w_world[:, 1], quat_w_world[:, 2], quat_w_world[:, 3]
+    # Extract quaternion components (xyzw convention: x=0, y=1, z=2, w=3)
+    x, y, z, w = quat_w_world[:, 0], quat_w_world[:, 1], quat_w_world[:, 2], quat_w_world[:, 3]
 
     # Fill rotation matrix using quaternion
     R_w_c[:, 0, 0] = 1 - 2 * (y**2 + z**2)
@@ -153,7 +154,7 @@ def foot_print(
 ) -> torch.Tensor:
     """Represent the foot print of the asset as a rectangle that is offset to the asset root."""
     robot: RigidObject = env.scene[asset_cfg.name]
-    root_pos = robot.data.root_pos_w - env.scene.env_origins
+    root_pos = wp.to_torch(robot.data.root_pos_w) - env.scene.env_origins
     root_pos_2d = root_pos[:, :2]
 
     def create_footprint_tensor(length, width, device):

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 
 import isaaclab.utils.math as math_utils
 from isaaclab.markers import VisualizationMarkers
@@ -38,7 +39,7 @@ class ActionVisualizer:
         if not self._base_markers or not self._residual_markers:
             self._initialize_action_markers()
         # Visualize base action.
-        robot_pos_w = self.robot.data.root_pos_w.clone()
+        robot_pos_w = wp.to_torch(self.robot.data.root_pos_w).clone()
         robot_pos_w[:, 2] += ACTION_HEIGHT
         base_action_arrow_scale, base_action_arrow_quat = self._resolve_xy_velocity_to_arrow(
             base_action[:, :2])
@@ -78,7 +79,7 @@ class ActionVisualizer:
         zeros = torch.zeros_like(heading_angle)
         arrow_quat = math_utils.quat_from_euler_xyz(zeros, zeros, heading_angle)
         # convert everything back from base to world frame
-        base_quat_w = self.robot.data.root_quat_w
+        base_quat_w = wp.to_torch(self.robot.data.root_quat_w)
         arrow_quat = math_utils.quat_mul(base_quat_w, arrow_quat)
 
         return arrow_scale, arrow_quat

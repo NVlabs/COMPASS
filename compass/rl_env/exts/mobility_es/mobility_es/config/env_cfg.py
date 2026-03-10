@@ -27,7 +27,8 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+from isaaclab.utils.noise import UniformNoiseCfg as Unoise
+from isaaclab_physx.physics import PhysxCfg
 
 from mobility_es.config import environments
 from mobility_es.config import scene_assets
@@ -47,7 +48,8 @@ EPISODE_LENGTH_S = 100
 class SceneCfg(InteractiveSceneCfg):
     """Common environment configuration with the nova ."""
 
-    # Ground terrain
+    # Set to None to disable terrain.
+    # Note: Nurec Real2Sim assets mostly come with a default ground terrain.
     terrain = scene_assets.terrain
 
     # Environment.
@@ -165,7 +167,7 @@ class CommandsCfg:
     goal_pose = commands_cfg.UniformCollisionFreePose2dCommandCfg(
         asset_name="robot",
         resampling_time_range=(EPISODE_LENGTH_S, EPISODE_LENGTH_S),
-        debug_vis=False,
+        debug_vis=True,
         simple_heading=False,
         ranges=commands_cfg.UniformCollisionFreePose2dCommandCfg.Ranges(
             pos_x=(-5, 5),
@@ -207,6 +209,8 @@ class EventCfg:
                 "pitch": (0.0, 0.0),
                 "yaw": (0.0, 0.0),
             },
+            # Default collision distance for start pose sampling
+            "collision_distance": 0.75,
         },
     )
 
@@ -311,10 +315,10 @@ class GoalReachingEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 20
         self.episode_length_s = EPISODE_LENGTH_S
-        self.rerender_on_reset = True
+        self.num_rerenders_on_reset = 1
         # simulation settings
         self.sim.dt = 0.005
-        self.sim.physx.bounce_threshold_velocity = 0.2
+        self.sim.physics = PhysxCfg(bounce_threshold_velocity=0.2)
         # default friction material
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 from typing import TYPE_CHECKING
 
 import isaaclab.utils.math as math_utils
@@ -38,7 +39,7 @@ def goal_pose_in_robot_frame(
 
     # Compute offset.
     robot = env.scene[robot_cfg.name]
-    robot_yaw = math_utils.euler_xyz_from_quat(robot.data.root_quat_w)[2].reshape(
+    robot_yaw = math_utils.euler_xyz_from_quat(wp.to_torch(robot.data.root_quat_w))[2].reshape(
         (goal_pose.shape[0], 1))
     offset_vec = torch.cat([
         offset[0] * torch.cos(robot_yaw) - offset[1] * torch.sin(robot_yaw),

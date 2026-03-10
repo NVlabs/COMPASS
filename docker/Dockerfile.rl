@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-lab:2.1.0
+FROM nvcr.io/nvidia/isaac-lab:3.0.0-beta
 
 WORKDIR /workspace
 

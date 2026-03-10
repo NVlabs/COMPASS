@@ -71,6 +71,24 @@ class Logger:
 
         print(f"Logger initialized with backend: {self.backend}")
 
+    def log_image(self, name: str, image_path: str, step: Optional[int] = None):
+        """
+        Log an image.
+        Args:
+            name: Name of the image
+            image_path: Path to the image file
+            step: Step number (if None, uses 0)
+        """
+        if step is None:
+            step = 0
+
+        if self.backend == "wandb":
+            wandb.log({name: wandb.Image(image_path, caption=f"Iteration {step}")}, step=step)
+        else:
+            # For TensorBoard, we would need to read the image and convert it
+            # For now, just note that it's not fully implemented
+            print(f"Image logging to TensorBoard not fully implemented. Image '{name}' not logged.")
+
     def log_video(self, name: str, video_path: str, fps: int = 4, step: Optional[int] = None):
         """
         Log a video.

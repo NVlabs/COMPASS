@@ -18,6 +18,7 @@ from __future__ import annotations
 import random
 
 import torch
+import warp as wp
 from typing import TYPE_CHECKING
 from collections.abc import Sequence
 
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from mobility_es.mdp.command.commands_cfg import UniformCollisionFreePose2dCommandCfg
 
 
-class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dCommand):
+class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
     """Command generator that generates pose commands containing a 3-D position and heading.
 
     The command generator samples uniform 2D positions around the environment origin. It sets
@@ -62,6 +63,7 @@ class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dComm
 
         # Create the occupancy map for collision check.
         self.collision_checker = env.collision_checker
+        self._env = env  # Store env reference to access precompute_valid_orientations flag
 
     def __str__(self) -> str:
         msg = "UniformCollisionFreePoseCommand:\n"
@@ -69,11 +71,62 @@ class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dComm
         return msg
 
     def _resample_command(self, env_ids: Sequence[int]):
+        # Check if precomputed goal poses are available
+        if self.collision_checker.has_precomputed_goal_poses():
+            # Use precomputed valid locations (these are in world coordinates)
+            num_samples = len(env_ids)
+
+            # Try to use orientation-aware sampling if available and enabled
+            use_precomputed_orientations = False
+            if (hasattr(self._env, 'precompute_valid_orientations') and
+                self._env.precompute_valid_orientations and
+                hasattr(self.collision_checker, 'sample_goal_pose_with_orientation')):
+                try:
+                    sampled_positions, sampled_yaws = (
+                        self.collision_checker.sample_goal_pose_with_orientation(
+                            num_samples, max_iteration=self.cfg.max_resample_trial))
+                    use_precomputed_orientations = True
+                except (ValueError, AttributeError):
+                    # Fall back to position-only sampling (will use random orientation)
+                    sampled_positions = self.collision_checker.sample_goal_pose(num_samples)
+                    use_precomputed_orientations = False
+            else:
+                sampled_positions = self.collision_checker.sample_goal_pose(num_samples)
+                use_precomputed_orientations = False
+
+            # Convert to torch tensor
+            sampled_positions_torch = torch.tensor(sampled_positions,
+                                                   device=self.device,
+                                                   dtype=torch.float32)
+
+            # Precomputed positions are in world coordinates from map origin
+            # pos_command_w is in world coordinates, but we need to add env origins
+            # since precomputed positions are relative to map origin (typically 0,0)
+            origins = self._env.scene.env_origins[env_ids, :2]
+            # Add env origins to precomputed positions to get absolute world coordinates
+            self.pos_command_w[env_ids, 0] = origins[:, 0] + sampled_positions_torch[:, 0]
+            self.pos_command_w[env_ids, 1] = origins[:, 1] + sampled_positions_torch[:, 1]
+            self.pos_command_w[env_ids, 2] = 0.0
+
+            # Use precomputed orientations if available, otherwise randomize
+            if use_precomputed_orientations:
+                sampled_yaws_torch = torch.tensor(sampled_yaws,
+                                                  device=self.device,
+                                                  dtype=torch.float32)
+                self.heading_command_w[env_ids] = sampled_yaws_torch
+            else:
+                # Randomize the heading
+                r = torch.empty(len(env_ids), device=self.device)
+                self.heading_command_w[env_ids] = r.uniform_(*self.cfg.ranges.heading)
+
+            return    # Early return since all poses are valid
+
+        # Fall back to original random sampling with collision checking
         resample_env_ids = env_ids
         num_resample_trials = 0
         while num_resample_trials < self.cfg.max_resample_trial:
             # Obtain origins for the robots
-            self.pos_command_w[resample_env_ids] = self.robot.data.root_pos_w[resample_env_ids]
+            self.pos_command_w[resample_env_ids] = wp.to_torch(self.robot.data.root_pos_w)[resample_env_ids]
             # Offset the position command by the current root position
             r = torch.empty(len(resample_env_ids), device=self.device)
             # Randomize the position
@@ -123,5 +176,6 @@ class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dComm
         # Get the points relative to the environment origin if the env prime is not global.
         if self._env.scene.cfg.environment.prim_path.startswith('/World/envs/'):
             sampled_points_r = sampled_points_r - self._env.scene.env_origins[env_ids, :2]
-        in_collisions = self.collision_checker.is_in_collision(sampled_points_r, distance=0.5)
+        in_collisions = self.collision_checker.is_in_collision(sampled_points_r,
+                                                               distance=self.cfg.collision_distance)
         return env_ids[torch.where(in_collisions == 1)[0]]
