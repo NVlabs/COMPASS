@@ -19,6 +19,9 @@ from datetime import datetime
 import numpy as np
 import h5py
 import gin
+# Set matplotlib backend before importing pyplot to avoid GUI backend issues
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for headless environments
 import matplotlib.pyplot as plt
 import torch
 from tqdm import tqdm
@@ -521,9 +524,9 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            # # Only save images for the first step to avoid too many files
-            if step != 0:
-                return
+            # # # Only save images for the first step to avoid too many files
+            # if step != 0:
+            #     return
 
             # Only save images at specified iteration intervals
             if iteration % self.debug_image_interval != 0:

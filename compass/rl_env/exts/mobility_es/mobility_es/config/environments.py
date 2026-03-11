@@ -44,8 +44,6 @@ USD_PATHS = {
         f'{ISAAC_NUCLEUS_DIR}/Environments/Hospital/hospital.usd',
     'NovaCarterGalileo_NuRec':
         os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/3dgrt/real2sim_galileo.usd"),
-    'Shannon_Bar':
-        os.path.join(os.path.dirname(__file__), "../usd/shannon/shannon-3.usd"),
 }
 
 OMAP_PATHS = {
@@ -69,11 +67,6 @@ OMAP_PATHS = {
         {
             "path": os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/3dgrt/omap/occupancy_map.yaml"),
             "origin_convention": "top-left"
-        },
-    'Shannon_Bar':
-        {
-            "path": os.path.join(os.path.dirname(__file__), "../usd/shannon/occupancy_map.yaml"),
-            "origin_convention": "bottom-left"
         },
 }
 

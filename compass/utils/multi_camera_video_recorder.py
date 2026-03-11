@@ -544,10 +544,32 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             combined_height = max(viewport_height, robot_height)
 
             # Create video writer for combined video
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            combined_writer = cv2.VideoWriter(
-                output_path, fourcc, combined_fps, (combined_width, combined_height)
-            )
+            # Use H.264 codec for browser compatibility (same as gymnasium's RecordVideo)
+            # Try multiple H.264 variants in order of preference (browser-compatible codecs)
+            codecs_to_try = ["avc1", "H264", "X264"]  # H.264 variants for browser compatibility
+            combined_writer = None
+            fourcc = None
+
+            for codec in codecs_to_try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                combined_writer = cv2.VideoWriter(
+                    output_path, fourcc, combined_fps, (combined_width, combined_height)
+                )
+                if combined_writer.isOpened():
+                    print(f"[MultiCameraVideoRecorder] Using codec '{codec}' for combined video (browser-compatible)")
+                    break
+                else:
+                    if combined_writer:
+                        combined_writer.release()
+                    combined_writer = None
+
+            # Fallback to mp4v only if no H.264 codec is available (not browser-compatible)
+            if not combined_writer:
+                print(f"[MultiCameraVideoRecorder][WARNING] No H.264 codec available, falling back to mp4v (may not be browser-compatible)")
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                combined_writer = cv2.VideoWriter(
+                    output_path, fourcc, combined_fps, (combined_width, combined_height)
+                )
 
             if not combined_writer.isOpened():
                 print(f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {output_path}")
