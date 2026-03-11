@@ -544,32 +544,13 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             combined_height = max(viewport_height, robot_height)
 
             # Create video writer for combined video
-            # Use H.264 codec for browser compatibility (same as gymnasium's RecordVideo)
-            # Try multiple H.264 variants in order of preference (browser-compatible codecs)
-            codecs_to_try = ["avc1", "H264", "X264"]  # H.264 variants for browser compatibility
-            combined_writer = None
-            fourcc = None
-
-            for codec in codecs_to_try:
-                fourcc = cv2.VideoWriter_fourcc(*codec)
-                combined_writer = cv2.VideoWriter(
-                    output_path, fourcc, combined_fps, (combined_width, combined_height)
-                )
-                if combined_writer.isOpened():
-                    print(f"[MultiCameraVideoRecorder] Using codec '{codec}' for combined video (browser-compatible)")
-                    break
-                else:
-                    if combined_writer:
-                        combined_writer.release()
-                    combined_writer = None
-
-            # Fallback to mp4v only if no H.264 codec is available (not browser-compatible)
-            if not combined_writer:
-                print(f"[MultiCameraVideoRecorder][WARNING] No H.264 codec available, falling back to mp4v (may not be browser-compatible)")
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                combined_writer = cv2.VideoWriter(
-                    output_path, fourcc, combined_fps, (combined_width, combined_height)
-                )
+            # Use mp4v codec (software encoding, works reliably)
+            # Then re-encode with ffmpeg to H.264 for browser compatibility
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            temp_output_path = output_path.replace(".mp4", "_temp.mp4")
+            combined_writer = cv2.VideoWriter(
+                temp_output_path, fourcc, combined_fps, (combined_width, combined_height)
+            )
 
             if not combined_writer.isOpened():
                 print(f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {output_path}")
@@ -637,14 +618,56 @@ class MultiCameraVideoRecorder(gym.Wrapper):
                     f"Check if both videos have valid frames."
                 )
                 # Clean up empty output file
-                if os.path.exists(output_path):
-                    os.remove(output_path)
+                if os.path.exists(temp_output_path):
+                    os.remove(temp_output_path)
             else:
-                # Verify the combined video file was actually created
-                if not os.path.exists(output_path):
+                # Verify the temp video file was created
+                if not os.path.exists(temp_output_path):
                     print(
-                        f"[MultiCameraVideoRecorder][ERROR] Combined video file was not created: {output_path}"
+                        f"[MultiCameraVideoRecorder][ERROR] Temp combined video file was not created: {temp_output_path}"
                     )
+                else:
+                    # Re-encode with ffmpeg to H.264 for browser compatibility
+                    try:
+                        import subprocess
+                        # Use ffmpeg to re-encode to H.264 (browser-compatible)
+                        ffmpeg_cmd = [
+                            "ffmpeg", "-y", "-i", temp_output_path,
+                            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                            "-c:a", "copy",  # Copy audio if present
+                            "-movflags", "+faststart",  # Enable fast start for web playback
+                            output_path
+                        ]
+                        result = subprocess.run(
+                            ffmpeg_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=300  # 5 minute timeout
+                        )
+                        if result.returncode == 0:
+                            # Remove temp file after successful re-encoding
+                            if os.path.exists(temp_output_path):
+                                os.remove(temp_output_path)
+                            print(f"[MultiCameraVideoRecorder] Re-encoded combined video to H.264 for browser compatibility")
+                        else:
+                            print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding failed: {result.stderr}")
+                            # Fallback: use temp file as final (may not be browser-compatible)
+                            if os.path.exists(temp_output_path):
+                                os.rename(temp_output_path, output_path)
+                    except FileNotFoundError:
+                        print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg not found, using mp4v codec (may not be browser-compatible)")
+                        # Fallback: use temp file as final
+                        if os.path.exists(temp_output_path):
+                            os.rename(temp_output_path, output_path)
+                    except subprocess.TimeoutExpired:
+                        print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding timed out, using temp file")
+                        if os.path.exists(temp_output_path):
+                            os.rename(temp_output_path, output_path)
+                    except Exception as e:
+                        print(f"[MultiCameraVideoRecorder][WARNING] Error during ffmpeg re-encoding: {e}")
+                        # Fallback: use temp file as final
+                        if os.path.exists(temp_output_path):
+                            os.rename(temp_output_path, output_path)
 
         except Exception as e:
             print(
