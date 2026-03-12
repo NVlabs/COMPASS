@@ -149,7 +149,7 @@ EnvSceneAssetCfgMap = {
     'combined_multi_rack': environments.combined_multi_rack,
     'random_envs': environments.random_envs,
     'hospital': environments.hospital,
-    'nova_carter_galileo_nurec': environments.nova_carter_galileo_nurec,
+    'nova_carter-galileo': environments.nova_carter_galileo_nurec,
 }
 
 
