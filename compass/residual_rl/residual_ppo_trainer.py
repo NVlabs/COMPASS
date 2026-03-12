@@ -524,9 +524,9 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            # # # Only save images for the first step to avoid too many files
-            # if step != 0:
-            #     return
+            # Only save images for the first step to avoid too many files
+            if step != 0:
+                return
 
             # Only save images at specified iteration intervals
             if iteration % self.debug_image_interval != 0:
@@ -562,19 +562,47 @@ class ResidualPPOTrainer:
 
                 for env_idx in range(start_env, end_env):
                     # Process RGB image
-                    rgb_img = rgb_images_np[env_idx]
+                    rgb_img = rgb_images_np[env_idx].copy()  # Make a copy to avoid modifying original
 
-                    # Reshape if flattened
+                    # Handle different image shapes - camera images are flattened in observations
                     if len(rgb_img.shape) == 1:
+                        # Flattened image - reshape to (H, W, C)
                         height, width = INPUT_IMAGE_SIZE[0], INPUT_IMAGE_SIZE[1]
                         channels = 3
-                        rgb_img = rgb_img.reshape(height, width, channels)
+                        expected_size = height * width * channels
+                        if rgb_img.size == expected_size:
+                            rgb_img = rgb_img.reshape(height, width, channels)
+                        else:
+                            print(f"[WARNING] Image size mismatch: expected {expected_size}, got {rgb_img.size}")
+                            continue
+                    elif len(rgb_img.shape) == 3:
+                        # Already in (H, W, C) or (C, H, W) format
+                        if rgb_img.shape[0] == 3 or rgb_img.shape[0] == 1:
+                            # Image is in (C, H, W) format - transpose to (H, W, C)
+                            rgb_img = np.transpose(rgb_img, (1, 2, 0))
+                        # Ensure it's (H, W, 3) - if grayscale, convert to RGB
+                        if len(rgb_img.shape) == 2:
+                            # Grayscale - convert to RGB
+                            rgb_img = np.stack([rgb_img] * 3, axis=-1)
+                        elif rgb_img.shape[2] == 1:
+                            rgb_img = np.repeat(rgb_img, 3, axis=2)
+                        elif rgb_img.shape[2] != 3:
+                            print(f"[WARNING] Unexpected image shape: {rgb_img.shape}")
+                            continue
 
-                    # Denormalize RGB from [0, 1] to [0, 255] if needed
-                    if rgb_img.max() <= 1.0:
-                        rgb_img = (rgb_img * 255).astype(np.uint8)
+                    # Ensure image is in correct range and type for matplotlib
+                    if rgb_img.dtype != np.uint8:
+                        if rgb_img.max() <= 1.0:
+                            rgb_img = (np.clip(rgb_img, 0, 1) * 255).astype(np.uint8)
+                        else:
+                            rgb_img = np.clip(rgb_img, 0, 255).astype(np.uint8)
                     else:
-                        rgb_img = rgb_img.astype(np.uint8)
+                        # Already uint8, but ensure values are in valid range
+                        rgb_img = np.clip(rgb_img, 0, 255)
+
+                    # Ensure image is contiguous in memory for matplotlib
+                    if not rgb_img.flags['C_CONTIGUOUS']:
+                        rgb_img = np.ascontiguousarray(rgb_img)
 
                     grid_images.append(rgb_img)
                     subtitles.append(f"RGB Env {env_idx}")
@@ -650,7 +678,21 @@ class ResidualPPOTrainer:
         # Plot images
         for i, (img, subtitle) in enumerate(zip(images, subtitles)):
             if i < len(axes):
-                axes[i].imshow(img)
+                # Ensure image is in correct format for matplotlib
+                # matplotlib.imshow expects (H, W, 3) for RGB or (H, W) for grayscale
+                if len(img.shape) == 3 and img.shape[2] == 3:
+                    # RGB image - ensure it's uint8 in [0, 255] range
+                    if img.dtype != np.uint8:
+                        img = np.clip(img, 0, 255).astype(np.uint8)
+                    axes[i].imshow(img, interpolation='nearest')
+                elif len(img.shape) == 2:
+                    # Grayscale image
+                    if img.dtype != np.uint8:
+                        img = np.clip(img, 0, 255).astype(np.uint8)
+                    axes[i].imshow(img, cmap='gray', interpolation='nearest')
+                else:
+                    # Fallback for other formats
+                    axes[i].imshow(img, interpolation='nearest')
                 axes[i].set_title(subtitle, fontsize=10)
                 axes[i].axis('off')
 
@@ -664,10 +706,24 @@ class ResidualPPOTrainer:
                      fontsize=14)
 
         # Save the grid
-        filename = f"camera_grid_{grid_idx}_iter_{iteration:04d}_step_{step:04d}_{timestamp}.jpg"
+        filename = f"camera_grid_{grid_idx}_iter_{iteration:04d}_step_{step:04d}_{timestamp}.png"
         filepath = os.path.join(self.debug_images_dir, filename)
-        plt.tight_layout()
-        plt.savefig(filepath, dpi=150, bbox_inches='tight')
-        plt.close()
 
-        return filepath
+        try:
+            plt.tight_layout()
+            # Use PNG format for better compatibility and lossless quality
+            # Set format explicitly and ensure proper saving
+            plt.savefig(filepath, dpi=150, bbox_inches='tight', format='png',
+                       facecolor='white', edgecolor='none', pad_inches=0.1)
+            plt.close()
+
+            # Verify file was created and is readable
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                return filepath
+            else:
+                print(f"[WARNING] Failed to save debug image: {filepath}")
+                return None
+        except Exception as e:
+            print(f"[ERROR] Exception while saving debug image: {e}")
+            plt.close()
+            return None
