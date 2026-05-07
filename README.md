@@ -190,6 +190,29 @@ To deploy COMPASS in Isaac Sim or on real robots using ROS2, please follow the d
 
 
 <details>
+<summary><strong>☁️ OSMO Cloud Submission</strong> (click to expand)</summary>
+
+### OSMO Cloud Submission
+
+Train, evaluate, record specialist data, or run generalist distillation on [OSMO](https://docs.nvidia.com/osmo/) with the Python launcher in [osmo/run_osmo.py](osmo/run_osmo.py):
+
+```bash
+export WANDB_API_KEY=<your-wandb-key>
+export HF_TOKEN=<your-hf-token>
+export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
+
+python osmo/run_osmo.py train \
+    --experiment-name pilot \
+    --wandb-project compass_train \
+    --base-policy-ckpt <my-wandb-entity>/<my-project>/x_mobility:v1
+```
+
+Workflow YAMLs live in [osmo/workflows/](osmo/workflows). See [osmo/README.md](osmo/README.md) for prerequisites, all four subcommands (`train` / `eval` / `record` / `distill`), and troubleshooting.
+
+</details>
+
+
+<details>
 <summary><strong>📊 Logging Options</strong> (click to expand)</summary>
 
 ### Logging

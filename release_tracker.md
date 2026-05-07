@@ -16,6 +16,7 @@
 | 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | ⬜ | TBD |
 | 5 | Auto OMap generation from USDs | P1 | ⬜ | TBD |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | ⬜ | TBD |
+| 7 | Docker-driven dev environment (`workflow/run.sh`) | P1 | ⬜ | TBD |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
 
@@ -28,7 +29,7 @@
 OSMO (#1) ──────────────────────────────────────────────────────────────────┤
 Agentic skills (#4) ────────────────────────────────────────────────────────┼──► Benchmark ──► Release
 Auto-OMap (#5) ─────────────────────────────────────────────────────────────┘
-Docs (#6) — parallel; finalized before tag
+Docs (#6), Dev environment (#7) — parallel; finalized before tag
 PR-FOLLOWUP (multi-cam recorder + video upload + debug images) — post-release, outside critical path
 ```
 
@@ -147,6 +148,23 @@ End-to-end workflow docs from X-Mobility install through COMPASS distillation an
 - [ ] Migrate existing README + `compass/rl_env/README.md` + `ros2_deployment/README.md` content into the site (don't duplicate, link)
 - [ ] Wire GitHub Actions to build & deploy on push to `main`
 - [ ] PR: <link>
+
+## 7. Docker-driven dev environment — P1
+
+Quality-of-life: cut first-time UX from "30–60 min, 6 manual steps" to "3 commands, ~3 min" by adding a top-level `workflow/run.sh` (build/start/shell/exec/stop subcommands) modeled on `robotic_grounding/workflow/run.sh`. Reuses `docker/Dockerfile.rl` (no second Dockerfile). Detailed plan at [`dev_env_plan.md`](dev_env_plan.md).
+
+- [ ] Add `workflow/run.sh` (subcommands: build / assets / start / shell / exec / stop)
+- [ ] Add `workflow/prepare_assets.sh` (USDs + X-Mobility ckpt, cache-aware)
+- [ ] Add `workflow/README.md` (subcommand reference, multi-GPU, VSCode attach)
+- [ ] Add `python` symlink to `${ISAACLAB_PATH}/isaaclab.sh` in `docker/Dockerfile.rl` (in-container ergonomics)
+- [ ] Add `./assets/` to `.dockerignore`
+- [ ] Update root `README.md` to lead with the Docker quick-start; keep bare-metal as fallback
+- [ ] Smoke test: `./workflow/run.sh build && ./workflow/run.sh assets && ./workflow/run.sh start` lands in a shell where `python run.py -c configs/train_config.gin --num_envs 1 --headless` reaches first PPO iteration
+- [ ] Smoke test: same image runs via `osmo/run_osmo.py train` (regression)
+- [ ] PR: <link>
+
+**Branch base:** off `liuw/isaaclab_3.0_migration` (PR-1) — sibling to PR-2 / PR-3.
+**Status:** plan saved to `dev_env_plan.md`; revisit after the P0 items land.
 
 ## Pre-release gates
 

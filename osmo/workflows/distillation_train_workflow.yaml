@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+version: 2
+workflow:
+  name: {{workflow_name}}
+  resources:
+    default:
+      cpu: 80
+      gpu: 4
+      memory: 800Gi
+      storage: 800Gi
+      platform: dgx-h100
+  tasks:
+  - name: train
+    image: {{image}}
+    command: ["/bin/bash"]
+    args: ["/tmp/entry.sh"]
+    files:
+      - path: /tmp/entry.sh
+        contents: |
+          set -ex
+
+          # Generate your W&B API key: https://wandb.ai/authorize
+          export WANDB_API_KEY={{wandb_api_key}}
+
+          # Create directory to store the trainning outputs.
+          OUTPUT_DIR="{{output}}/outputs"
+          mkdir -p $OUTPUT_DIR
+          mkdir -p $OUTPUT_DIR/tensorboard_logs/lightning_logs
+
+          # Get dataset folder.
+          DATASET_FOLDER_NAME=$(echo {{dataset_name}} | cut -d'/' -f2 | cut -d':' -f1)
+
+          TRAIN_CMD="python3 distillation_train.py -c configs/{{train_config}}.gin -o $OUTPUT_DIR -d {{input:0}}/$DATASET_FOLDER_NAME/data -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb"
+
+          # Get pretrained checkpoint if provided.
+          if [ -z "{{checkpoint_artifact}}" ]; then
+            echo "No pretrained checkpoint, train from scratch."
+          else
+            echo "Downloading checkpoint: {{checkpoint_artifact}}"
+            wandb artifact get {{checkpoint_artifact}} --root ./
+            TRAIN_CMD="$TRAIN_CMD -p ./model.ckpt"
+          fi
+
+          eval $TRAIN_CMD
+
+    inputs:
+    - dataset:
+        name: {{dataset_name}}
+    outputs:
+    - dataset:
+        name: ml_nav_outputs:{{workflow_id}}
+        path: outputs
+
+default-values:
+  image: ""
+  workflow_name: compass_distillation
+  train_config: distillation_config
+  checkpoint_artifact: ""

@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+version: 2
+workflow:
+  name: {{workflow_name}}
+  resources:
+    default:
+      cpu: 20
+      gpu: 2
+      memory: 200Gi
+      platform: ovx-l40
+      storage: 1200Gi
+  tasks:
+  - name: train
+    image: {{image}}
+    command: ["/bin/bash"]
+    args: ["/tmp/entry.sh"]
+    environment:
+      ACCEPT_EULA: Y
+    files:
+    - contents: |
+        # Set up environment
+        apt update
+
+        set -e
+        # Hide conflicting Vulkan files, if needed
+        if [ -e "/usr/share/vulkan" ] && [ -e "/etc/vulkan" ]; then
+          mv /usr/share/vulkan /usr/share/vulkan_hidden
+        fi
+
+        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli login --token {{hf_token}}
+
+        # Generate your W&B API key: https://wandb.ai/authorize
+        export WANDB_API_KEY={{wandb_api_key}}
+
+        # Copy the USDs to desired place
+        echo "Preparing USD files"
+        cp -r {{input:0}}/groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
+
+        # Create directory to store the training outputs.
+        OUTPUT_DIR="{{output}}/outputs"
+        mkdir -p $OUTPUT_DIR
+
+        # Download base policy.
+        echo "Downloading base policy checkpoint: {{base_policy_ckpt_artifact}}"
+        ${ISAACLAB_PATH}/isaaclab.sh -p -m wandb artifact get {{base_policy_ckpt_artifact}} --root ./base_policy/
+
+        # Launch recording.
+        CMD="${ISAACLAB_PATH}/isaaclab.sh -p record.py -c configs/distillation_dataset_config.yaml -o $OUTPUT_DIR -b ./base_policy/model.ckpt --dataset-name {{dataset_name}}"
+
+        echo $CMD
+        eval $CMD
+
+      path: /tmp/entry.sh
+    - contents: |
+        {
+            "launch_config": {
+                "headless": true
+            }
+        }
+      path: /tmp/config.json
+
+    inputs:
+    - dataset:
+        name: groot_mobility_rl_es_usds
+    outputs:
+    - dataset:
+        name: {{dataset_name}}:{{workflow_id}}
+        path: outputs/{{dataset_name}}/data
+
+
+default-values:
+  image: ""
+  base_policy_ckpt_artifact: ""
+  workflow_name: compass_rl_es
+  dataset_name: compass_rl_es_experts
