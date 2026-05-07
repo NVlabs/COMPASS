@@ -84,7 +84,7 @@ combined_single_rack = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/CombinedSingleRack",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['CombinedSingleRack'],
@@ -107,7 +107,7 @@ combined_multi_rack = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/CombinedMultiRack",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['CombinedMultiRack'],
@@ -130,7 +130,7 @@ galileo_lab = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/GalileoLab",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['GalileoLab'],
@@ -149,7 +149,7 @@ warehouse_single_rack = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/WarehouseSingleRack",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['WarehouseSingleRack'],
@@ -167,7 +167,7 @@ warehouse_multi_rack = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/WarehouseMultiRack",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['WarehouseMultiRack'],
@@ -190,7 +190,7 @@ simple_office = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/SimpleOffice",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['SimpleOffice'],
@@ -209,7 +209,7 @@ hospital = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/Hospital",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.UsdFileCfg(
         usd_path=USD_PATHS['Hospital'],
@@ -233,7 +233,7 @@ random_envs = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/RandomEnvs",
     init_state=AssetBaseCfg.InitialStateCfg(
         pos=(0, 0, 0.01),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        rot=(0.0, 0.0, 0.0, 1.0),
     ),
     spawn=sim_utils.MultiUsdFileCfg(
         usd_path=[USD_PATHS['SimpleOffice'], USD_PATHS['GalileoLab'], USD_PATHS['SimpleWarehouse']],

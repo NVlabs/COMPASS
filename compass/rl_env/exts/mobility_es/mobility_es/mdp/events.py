@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 
 import isaaclab.utils.math as math_utils
 from isaaclab.managers import SceneEntityCfg
@@ -30,8 +31,9 @@ def sample_root_state_uniform(env: RLESEnvWrapper,
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
     # extract the used quantities (to enable type-hinting)
     asset = env.scene[asset_cfg.name]
-    # get default root state
-    root_states = asset.data.default_root_state[env_ids].clone()
+    # get default root state (pose and velocity separately in IsaacLab 3.0)
+    default_root_pose = wp.to_torch(asset.data.default_root_pose)[env_ids].clone()
+    default_root_vel = wp.to_torch(asset.data.default_root_vel)[env_ids].clone()
 
     # Sample poses
     pose_range_list = [
@@ -43,10 +45,10 @@ def sample_root_state_uniform(env: RLESEnvWrapper,
     rand_samples = math_utils.sample_uniform(pose_ranges[:, 0],
                                              pose_ranges[:, 1], (len(env_ids), 6),
                                              device=asset.device)
-    positions = root_states[:, 0:3] + env.scene.env_origins[env_ids] + rand_samples[:, 0:3]
+    positions = default_root_pose[:, 0:3] + env.scene.env_origins[env_ids] + rand_samples[:, 0:3]
     orientations_delta = math_utils.quat_from_euler_xyz(rand_samples[:, 3], rand_samples[:, 4],
                                                         rand_samples[:, 5])
-    orientations = math_utils.quat_mul(root_states[:, 3:7], orientations_delta)
+    orientations = math_utils.quat_mul(default_root_pose[:, 3:7], orientations_delta)
 
     # Sample velocities
     velocity_range_list = [
@@ -56,7 +58,7 @@ def sample_root_state_uniform(env: RLESEnvWrapper,
     rand_samples = math_utils.sample_uniform(velocity_ranges[:, 0],
                                              velocity_ranges[:, 1], (len(env_ids), 6),
                                              device=asset.device)
-    velocities = root_states[:, 7:13] + rand_samples
+    velocities = default_root_vel + rand_samples
 
     return positions, orientations, velocities
 

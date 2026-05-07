@@ -6,9 +6,9 @@ This directory contains Isaac Lab extension for mobility embodiment specialist w
 
 ## Installation
 
-1. First, install Isaac Lab v2.1.0 and Isaac Sim 4.5 by following the [Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v2.1.0/source/setup/installation/index.html).
+1. First, install Isaac Lab v3.0.0-beta1 and Isaac Sim 4.5 by following the [Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta1/source/setup/installation/index.html).
 
-   The repo has been tested in Isaac Lab v2.1.0, so follow the steps below to set the correct version:
+   The repo has been tested in Isaac Lab v3.0.0-beta1, so follow the steps below to set the correct version:
    ```bash
    # Clone the Isaac Lab repository
    git clone git@github.com:isaac-sim/IsaacLab.git
@@ -16,7 +16,7 @@ This directory contains Isaac Lab extension for mobility embodiment specialist w
    # Switch to the correct version
    cd IsaacLab
    git fetch origin
-   git checkout v2.1.0
+   git checkout v3.0.0-beta1
 
    # Install Isaac Lab
    ./isaaclab.sh --install

@@ -24,7 +24,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+from isaaclab.utils.noise import UniformNoiseCfg as Unoise
 
 from mobility_es.config import scene_assets
 from mobility_es.config.robots import digit, DIGIT_ACTUATED_JOINT_NAMES
@@ -58,7 +58,7 @@ class DigitGoalReachingEnvCfg(GoalReachingEnvCfg):
         self.scene.camera = scene_assets.camera.replace(
             prim_path="{ENV_REGEX_NS}/Robot/torso_base/front_cam")
         self.scene.camera.offset = CameraCfg.OffsetCfg(pos=(0.06, 0.0, -0.065),
-                                                       rot=(-0.2705, 0.6532, -0.6532, 0.2705981),
+                                                       rot=(0.6532, -0.6532, 0.2705981, -0.2705),
                                                        convention="ros")
 
         self.actions = DigitActionsCfg()

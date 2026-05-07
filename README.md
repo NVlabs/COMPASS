@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Isaac Lab](https://img.shields.io/badge/IsaacLab-2.1.0-b.svg)](https://isaac-sim.github.io/IsaacLab/v2.1.0/index.html)
+[![Isaac Lab](https://img.shields.io/badge/IsaacLab-3.0.0--beta1-b.svg)](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta1/index.html)
 [![IsaacSim](https://img.shields.io/badge/IsaacSim-4.5.0-b.svg)](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/index.html)
 [![Linux platform](https://img.shields.io/badge/Platform-linux--64-orange.svg)](https://ubuntu.com/blog/tag/22-04-lts)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
