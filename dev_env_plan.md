@@ -1,163 +1,177 @@
-# Docker-driven dev environment plan
+# Docker-as-venv dev environment plan
 
-> Quality-of-life follow-up to the COMPASS 2.0 release. Not a release blocker; revisit after the P0 items in `release_tracker.md` land.
+> Quality-of-life follow-up to the COMPASS 2.0 release. Live shape of the work
+> is in this file; tracker entry is in `release_tracker.md` § 7.
 
 ## Context
 
-The current README quick-start is **6–8 manual steps and ~30–60 min on first run**: clone Isaac Lab, checkout `v3.0.0-beta1`, `./isaaclab.sh --install`, set `ISAACLAB_PATH`, create a venv, `pip install -r requirements.txt` through the Isaac Lab wrapper, install the X-Mobility wheel, download the X-Mobility checkpoint from HuggingFace, download `compass_usds.zip` and unzip into `compass/rl_env/exts/mobility_es/mobility_es/usd/`.
+Pre-PR-7 first-run UX is **6–8 manual steps and ~30–60 min**: clone Isaac Lab,
+checkout `v3.0.0-beta1`, `./isaaclab.sh --install`, set `ISAACLAB_PATH`, create
+a venv, `pip install -r requirements.txt` through the wrapper, install the
+X-Mobility wheel, download the X-Mobility checkpoint, download `compass_usds.zip`
+and unzip. The bare-metal path also breaks on the wrong host Python / stale
+Vulkan SDK.
 
-PR-1 (`liuw/isaaclab_3.0_migration`) already bakes those installs into `docker/Dockerfile.rl` so the *image* is one-step ready, but the *user-facing quick start* still walks through the host-side install dance.
+PR-1 (`liuw/isaaclab_3.0_migration`) already bakes those installs into
+`docker/Dockerfile.rl`, so the *image* is one-step ready. PR-7 fills in the
+host-facing UX.
 
-Reference pattern (well-liked by the team): `/home/liuw/Projects/video_to_data/robotic_grounding/workflow/run.sh` — single-script entry point with `build` / `start` / `shell` / `exec` / `stop` subcommands that runs an interactive container with the repo bind-mounted, GPU + X11 forwarded, host UID/GID preserved. Daily UX: `./workflow/run.sh start` and you're in a shell that behaves like a venv.
+**Goal:** cut first-run UX to **"3 commands, ~3 min after the image build"**
+**and** make the steady-state dev loop feel like a Python venv — host-side
+editor, host-side shell, but every `python`/`pip`/`tensorboard` invocation
+transparently routed through the container.
 
-**Goal:** cut COMPASS first-time UX from "30–60 min, 6 manual steps" to **"3 commands, ~3 min after the image build"** without removing the bare-metal path for users who can't use Docker.
+## Three-layer dev model
 
-## Approach
+```
+Host shell  ──►  shim PATH  ──►  docker exec  ──►  daemon container
+(your editor,    (auto-set by                       (compass-rl image,
+ your terminal,  `source docker/activate`)          repo bind-mounted at
+ your prompt)                                        /workspace/COMPASS)
+```
 
-Add a new top-level `workflow/` directory that mirrors the robotic_grounding shape (familiar to the team, pattern proven). The image itself stays `docker/Dockerfile.rl` — already correct after PR-1; no second Dockerfile needed. The dev script just wraps `docker run` with the right flags.
+`source docker/activate` brings up a long-running daemon container if needed,
+prepends a tmp shim dir to `PATH`, and rewrites `PS1` to show `(compass-rl)`.
+The shims (`python`, `pip`, `isaaclab.sh`, `tensorboard`, `pytest`, `yapf`,
+`pylint`, `pre-commit`) each `docker exec` the same-named binary inside the
+container, with the host CWD translated to the container path. `deactivate`
+reverts PATH/PS1 and removes the shim dir; the container keeps running until
+`./docker/run.sh down`.
+
+## Layout
 
 ```
 COMPASS/
-├── workflow/                    ← NEW
-│   ├── run.sh                   ← single entry point (subcommand-based)
-│   ├── prepare_assets.sh        ← USDs + X-Mobility ckpt downloader (cache-aware)
-│   └── README.md                ← quickstart + reference for run.sh subcommands
 ├── docker/
-│   ├── Dockerfile.rl            ← unchanged, reused by workflow/ AND osmo/
-│   └── Dockerfile.distillation  ← unchanged
-├── osmo/                        ← unchanged (uses same image, different launcher)
-└── README.md                    ← updated Installation section to lead with workflow/run.sh
+│   ├── Dockerfile.rl         # +5 lines vs PR-1: WORKDIR /workspace/COMPASS, python wrapper
+│   ├── Dockerfile.distillation
+│   ├── run.sh                # build/assets/up/down/exec/shell/status
+│   ├── activate              # source me; shim PATH + (compass-rl) prompt
+│   ├── prepare_assets.sh     # HF downloader (USDs + X-Mobility ckpt)
+│   └── README.md             # subcommand reference + troubleshooting
+├── osmo/                     # unchanged (uses the same image, different launcher)
+└── README.md                 # Quick Start leads with ./docker/run.sh
 ```
 
-## `workflow/run.sh` design
+Everything Docker-related lives under `docker/`. No new top-level dir, no
+`run.sh`-vs-`run.py` confusion at the repo root.
 
-Subcommands (mirror `robotic_grounding/workflow/run.sh:1-18`):
+## Elegance: one bind-mount covers everything
 
-```
-./workflow/run.sh build [tag]                     # docker build -f docker/Dockerfile.rl
-./workflow/run.sh assets [--hf-token TOK]         # download/cache USDs + X-Mobility ckpt to ./assets
-./workflow/run.sh start [tag] [gpu]               # start container as daemon + drop into bash
-./workflow/run.sh shell [tag] [gpu]               # re-enter the running container
-./workflow/run.sh exec  [tag] [gpu] -- <cmd>      # one-shot command in container
-./workflow/run.sh stop  [tag] [gpu]               # docker stop + rm
-```
-
-`start` does (lifted from `robotic_grounding/workflow/run.sh:101-218` with COMPASS-specific paths):
-
-| Aspect | Detail |
-|--------|--------|
-| Image tag | `compass-rl:${tag-latest}` (default `latest`) |
-| Container name | `compass-rl-${tag}-gpu${GPU_DEVICE}` so multiple devs / multiple GPUs don't collide |
-| GPU select | `--gpus device=${GPU_DEVICE-all}` |
-| Repo bind-mount | `$(pwd) → /workspace` (overrides the COPY in Dockerfile.rl so host edits hot-reload, while the editable `pip install -e ./compass/rl_env/exts/mobility_es` still resolves) |
-| Assets bind-mount | `./assets/usd → /workspace/compass/rl_env/exts/mobility_es/mobility_es/usd:ro` and `./assets/x_mobility.ckpt → /workspace/x_mobility.ckpt:ro` if present |
-| X11 | `-e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix:rw --net=host` (matches what we used in PR-1's `--viz kit` smoke) |
-| Isaac Sim cache | `~/.cache/compass/${container}/kit` bind-mounted to writable kit cache dirs (parallel to `robotic_grounding/workflow/run.sh:184-187`) |
-| Credentials | `WANDB_API_KEY` and `HF_TOKEN` forwarded from env (or `~/.wand_api_key` fallback per robotic_grounding pattern) |
-| EULA | `-e ACCEPT_EULA=Y -e OMNI_KIT_ALLOW_ROOT=1` (already in Dockerfile.rl as ENV; redundant flags are harmless and explicit) |
-| UID/GID mapping | Custom `/etc/passwd` + `/etc/group` written to a tmp file and bind-mounted (lifted from `robotic_grounding/workflow/run.sh:165-174`) so files written from inside the container are owned by the host user |
-| Entry | `docker run -d ... bash` then `docker exec -it ... bash` to drop user into a shell |
-
-`assets` does (extends `ros2_deployment/prepare_assets.sh` patterns: token check, file integrity, wget/curl fallback, colored output):
+Single source of truth for mount + env args is `_compass_run_args()` inside
+`docker/run.sh`. The complete list:
 
 ```bash
-./workflow/run.sh assets [--hf-token TOK] [--cache-dir ./assets]
+-v "${REPO_ROOT}:/workspace/COMPASS"               # repo (covers code + configs + ./assets/)
+-v "/tmp/.X11-unix:/tmp/.X11-unix:rw"              # X server socket
+-v "${HOME}/.cache/compass/kit:/isaac-sim/kit/cache"  # writable shader cache
+-e HOME=/workspace/COMPASS                         # routes pip / pre-commit / hf caches into the bind-mount
+-e DISPLAY=$DISPLAY
+-e WANDB_API_KEY=$WANDB_API_KEY
+-e HF_TOKEN=$HF_TOKEN
+-e ACCEPT_EULA=Y
+-e OMNI_KIT_ALLOW_ROOT=1
+--gpus all
+--net=host
+--user "$(id -u):$(id -g)"
+--passwd-entry "$(id -un):x:$(id -u):$(id -g):COMPASS dev:/workspace/COMPASS:/bin/bash"
+--workdir /workspace/COMPASS
 ```
 
-- Reads `$HF_TOKEN` or `--hf-token`; errors with the same instructional message style as `prepare_assets.sh:48-63` if missing
-- Downloads `compass_usds.zip` from `https://huggingface.co/nvidia/COMPASS/resolve/main/compass_usds.zip` to `./assets/compass_usds.zip`, validates non-empty, unzips to `./assets/usd/` (skips re-download if the unpacked dir exists)
-- Downloads `https://huggingface.co/nvidia/X-Mobility/resolve/main/x_mobility-nav2-semantic_action_path.ckpt` to `./assets/x_mobility.ckpt` (skips if present and non-empty)
-- Prints a summary like `prepare_assets.sh:128-151` with cache paths and sizes
+That's it: **three bind-mounts, six env vars**. Compare to
+`robotic_grounding/workflow/run.sh:101-218` which mounts ~10 paths individually
+because it isn't structured around a single repo root.
 
-`build` does:
+### Why `/workspace/COMPASS` instead of `/workspace`
+
+The base image (`nvcr.io/nvidia/isaac-lab:3.0.0-beta1`) already places Isaac Lab
+at `/workspace/isaaclab`. Bind-mounting `$(pwd) → /workspace` would shadow it.
+Mounting at `/workspace/COMPASS` keeps `/workspace/isaaclab` accessible at its
+expected `${ISAACLAB_PATH}` path while still putting the host repo at a stable
+location inside the container.
+
+## Container naming
 
 ```bash
-docker build --network=host -f docker/Dockerfile.rl -t compass-rl:${tag} .
+COMPASS_CONTAINER="compass-$(id -un)-$(printf '%s' "${REPO_ROOT}" | sha1sum | cut -c1-8)"
 ```
 
-Adding a `.dockerignore` entry for `./assets/` so it doesn't bloat the build context.
+Hash of the absolute repo path → multiple checkouts of COMPASS coexist without
+colliding, and the same checkout always lands on the same container name.
 
-## Convenience inside the container
+## `python` wrapper (Dockerfile.rl change)
 
-Add to `docker/Dockerfile.rl` (one new line):
+`isaaclab.sh` is a Python CLI (it `exec`s `python -c "from isaaclab.cli import cli; cli()" "$@"`),
+so symlinking `python → isaaclab.sh` would put you inside the CLI rather than at
+a Python prompt. Instead the Dockerfile installs a real wrapper:
 
 ```dockerfile
-RUN ln -sf ${ISAACLAB_PATH}/isaaclab.sh /usr/local/bin/python-il && \
-    ln -sf ${ISAACLAB_PATH}/isaaclab.sh /usr/local/bin/python
+RUN printf '#!/usr/bin/env bash\nexec "${ISAACLAB_PATH}/_isaac_sim/python.sh" "$@"\n' \
+        > /usr/local/bin/python \
+ && chmod +x /usr/local/bin/python \
+ && ln -sf /usr/local/bin/python /usr/local/bin/python3
 ```
 
-(`robotic_grounding/workflow/Dockerfile:102-107` pattern — lets users type `python run.py ...` instead of `${ISAACLAB_PATH}/isaaclab.sh -p run.py ...` once inside the container.)
+Now `python run.py` inside the container resolves directly to Isaac Sim's
+bundled `python.sh`, bypassing the CLI overhead and matching what
+`isaaclab.sh -p` would have done.
 
-This is a small Dockerfile.rl tweak. Lands in this PR (not amended into PR-1) so PR-1 stays a clean bucket-A migration.
+## Git workflow
 
-## Updated `README.md` quickstart
+`git` itself runs **on the host** — no shim. Repo is on host, SSH/GPG keys are
+on host, `git commit -s` (DCO) and `git push` work without extra plumbing.
+File ownership stays consistent because the container runs as
+`--user "$(id -u):$(id -g)"`.
 
-Add a new section **before** the existing "Installation" details, marked as the recommended path:
+The wrinkle: pre-commit hooks (yapf, pylint, clang-format) live in the
+container's Python, not on the host. So:
 
-````markdown
-## Quick Start (Docker, recommended)
+- **Activate before committing.** `pre-commit` is in the shim list, so when
+  host `git commit -s` invokes it via PATH, the shim routes the hook into the
+  container.
+- **Hook-env cache** lives at `./.cache/pre-commit/` (inside the bind-mount),
+  surviving `down` + `up`. `.cache/` is gitignored.
 
-1. `./workflow/run.sh assets` — download USDs + X-Mobility ckpt (one-time, ~5 min)
-2. `./workflow/run.sh build` — build the dev image (one-time, ~10 min on first run)
-3. `./workflow/run.sh start` — open a shell in the container
+## Files
 
-Inside the container:
-```bash
-python run.py -c configs/train_config.gin -o /tmp/out -b /workspace/x_mobility.ckpt --enable_camera
-```
+| Path | Status | Why |
+|------|--------|-----|
+| `docker/run.sh` | NEW | Subcommand wrapper around `docker {build,run,exec,rm}`; single source of truth for mount/env args |
+| `docker/activate` | NEW | Sourced; shim PATH, PS1 prefix, `deactivate` |
+| `docker/prepare_assets.sh` | NEW | HF downloader (USDs + X-Mobility ckpt) |
+| `docker/README.md` | NEW | Subcommand reference + troubleshooting |
+| `docker/Dockerfile.rl` | MODIFIED | `WORKDIR /workspace/COMPASS`; install paths under `/workspace/COMPASS`; `python`/`python3` wrapper |
+| `.dockerignore` | MODIFIED | Add `./assets/`, `./.cache/`, `./.git/` |
+| `.gitignore` | MODIFIED | Add `/assets/`, `/.cache/` |
+| `README.md` | MODIFIED | Quick Start leads with `./docker/run.sh` + `source ./docker/activate`; bare-metal moves under "Manual install" |
+| `release_tracker.md` | MODIFIED | Item #7 status flipped 🟡; checklist progress |
 
-That's it. See `workflow/README.md` for subcommands and customization (multi-GPU, viz mode, etc.).
+## Branch + commit
 
-## Manual install
-
-If you can't use Docker, follow the bare-metal installation in `compass/rl_env/README.md`.
-````
-
-The existing collapsed `<details>` block stays — keep both paths — but the Docker path becomes the primary recommendation.
-
-## `workflow/README.md` content
-
-- Prerequisites: docker, NVIDIA Container Toolkit, GPU, an HF account + token
-- One-page reference for each `run.sh` subcommand with examples
-- Multi-GPU / multi-container instructions (`./workflow/run.sh start latest 0`, `./workflow/run.sh start latest 1` simultaneously)
-- VSCode/Cursor "Attach to Running Container" tip (lifted from `robotic_grounding/README:79-81`)
-
-## Branch + commit strategy
-
-- New branch `liuw/dev_environment` off `liuw/isaaclab_3.0_migration` (PR-1) — the dev script benefits from PR-1's "image bakes installs" change. Sibling to PR-2 and PR-3.
-- Single squashed commit: "Add Docker-driven dev environment (`workflow/run.sh`)"
+- Branch `liuw/dev_environment`, off `liuw/auto_omap_from_usd` (PR-5 head, latest
+  in the stack).
+- Single squashed DCO-signed commit titled
+  "Add Docker-as-venv dev environment (`docker/run.sh` + `docker/activate`)".
 
 ## Verification
 
-1. **`./workflow/run.sh build`** completes; `docker images | grep compass-rl` shows the tag.
-2. **`./workflow/run.sh assets`** with a fresh `./assets/` dir downloads + extracts both, exits with a summary; second invocation is a no-op (cache hit).
-3. **`./workflow/run.sh start`** opens a bash shell where:
-   - `pwd` = `/workspace`
-   - `ls compass/rl_env/exts/mobility_es/mobility_es/usd/` shows the bind-mounted USDs
-   - `ls /workspace/x_mobility.ckpt` shows the bind-mounted ckpt
-   - `whoami` returns the host user, not `root` (UID/GID mapping working)
-   - `nvidia-smi` shows the GPU
-   - `python run.py --help` works without manually invoking `isaaclab.sh -p` (thanks to the Dockerfile symlink)
-4. **End-to-end smoke**: from inside the shell, `python run.py -c configs/train_config.gin -o /tmp/out -b /workspace/x_mobility.ckpt --num_envs 1 --enable_camera --headless` reaches first PPO iteration (matches PR-1's local smoke test path).
-5. **`./workflow/run.sh exec latest 0 -- python run.py --help`** runs from outside the container.
-6. **`./workflow/run.sh shell`** re-enters the same container after `Ctrl-D` exit.
-7. **`./workflow/run.sh stop`** cleanly tears the container down.
-8. **OSMO compatibility** — `osmo/run_osmo.py train ... --image <built-from-workflow>` still works. Same image, different launcher.
-
-## Decisions baked in (flag if any are wrong)
-
-1. Layout name: `workflow/` (matches robotic_grounding). Alternative: `dev/`. Picking `workflow/` for team-pattern familiarity.
-2. Reuse `docker/Dockerfile.rl` (no `Dockerfile.dev`); only addition is the `python` symlink for in-container ergonomics.
-3. Keep both quick-start paths in README (Docker primary, bare-metal kept under "Manual install").
-4. `workflow/run.sh` is bash, not Python. Python would be cleaner but bash matches `ros2_deployment/build_compass_docker.sh` house style and avoids pulling Python into the host bootstrap.
-5. The `python` symlink lives in this PR, not amended into PR-1. PR-1 stays a clean bucket-A migration.
+1. **`./docker/run.sh build`** — image builds; `docker images | grep compass-rl` shows the tag.
+2. **`./docker/run.sh assets`** — fresh `./assets/` dir gets `usd/` and `x_mobility.ckpt`; second run is a no-op.
+3. **`./docker/run.sh up`** — daemon container starts; `./docker/run.sh status` reports `running` with the path-hashed name.
+4. **`source ./docker/activate`** — prompt becomes `(compass-rl) …`; `which python` resolves to the shim dir; `python -V` reports Isaac Sim's bundled Python.
+5. **CWD translation** — `cd compass/rl_env/exts/mobility_es && python -c 'import os; print(os.getcwd())'` prints `/workspace/COMPASS/compass/rl_env/exts/mobility_es`.
+6. **End-to-end smoke** — from the activated shell:
+   `python run.py -c configs/train_config.gin -o /tmp/out -b ./assets/x_mobility.ckpt --num_envs 1 --enable_camera --headless` reaches first PPO iteration.
+7. **`deactivate`** — prompt + PATH revert; shim dir removed from `/tmp`.
+8. **`./docker/run.sh down`** — container removed; `docker ps -a | grep compass-` returns nothing.
+9. **OSMO compatibility** — `osmo/run_osmo.py train ... --image <built-via-docker/run.sh>` still works.
+10. **Pre-commit clean (activated shell)** — `pre-commit run --files docker/run.sh docker/activate docker/prepare_assets.sh docker/README.md docker/Dockerfile.rl README.md`.
+11. **Git commit signs cleanly** — `git commit -s -m "test" --allow-empty` from an activated shell completes; resulting commit shows DCO trailer.
 
 ## Out of scope
 
-- Replacing `osmo/run_osmo.py` — different concern, lives on top of the same image.
-- Removing the bare-metal install instructions in `compass/rl_env/README.md` — keep them for users who can't use Docker.
-- Adding `docker compose` — `docker run` with `run.sh` wrapping is enough; compose adds a dependency without UX gain for our case.
-
-## Where this fits in the release tracker
-
-Add as a **new item #7 (P1)** in `release_tracker.md` — quality-of-life, not a release blocker. Doesn't change the dependency graph (parallel to #1, #4, #5, #6).
+- Replacing `osmo/run_osmo.py` — different concern; same image.
+- Removing the bare-metal install in `compass/rl_env/README.md` — kept for non-Docker users.
+- `docker compose` — single container, single image; compose adds a dep without UX gain.
+- VSCode `.devcontainer` — orthogonal; works alongside the activate model.
+- Pushing branches / opening PRs — held per current standing instruction.

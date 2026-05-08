@@ -26,14 +26,29 @@ COMPASS is a novel framework for cross-embodiment mobility that combines:
 - Residual Reinforcement Learning (RL) for embodiment-specific adaptation
 - Policy distillation to create a unified, generalist policy
 
-## Quick Start
+## Quick Start (Docker, recommended)
 
-🚀 **Get started in 3 steps:**
-1. [Install Isaac Lab and dependencies](#installation)
-2. [Train your own specialists or deploy on robots](#usage)
-3. [Data generation for GR00T post-training](#gr00t-post-training-with-compass-datasets)
+🚀 **Three commands and you're training:**
 
-## Installation
+```bash
+export HF_TOKEN=hf_xxx                  # https://huggingface.co/settings/tokens
+
+./docker/run.sh assets                  # USDs + X-Mobility ckpt → ./assets/   (~5 min, one-time)
+./docker/run.sh build                   # build the dev image                   (~10 min, first run)
+source ./docker/activate                # venv-like activation (prompt: (compass-rl))
+python run.py -c configs/train_config.gin -o /tmp/out -b ./assets/x_mobility.ckpt --enable_camera
+```
+
+`python` is now a shim that runs inside the container. Edit code with your host
+editor — the bind-mount means changes hot-reload. `deactivate` to leave;
+`./docker/run.sh down` to stop the container.
+
+See [`docker/README.md`](docker/README.md) for subcommand reference, multi-checkout / multi-GPU notes,
+and troubleshooting.
+
+## Manual install (bare-metal)
+
+If you can't use Docker, follow the bare-metal instructions below.
 
 <details>
 <summary><strong>📦 Complete Installation Guide</strong> (click to expand)</summary>

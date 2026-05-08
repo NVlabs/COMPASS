@@ -1,2 +1,7 @@
 ./compass/rl_env/exts/mobility_es/mobility_es/usd
 ./venv
+./assets
+./.cache
+./.git
+./.nv
+./.nvidia-omniverse

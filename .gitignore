@@ -36,3 +36,10 @@ ros2_deployment/assets/
 *.onnx
 *.engine
 *.trt
+
+# Docker dev environment (assets downloaded by docker/prepare_assets.sh, caches
+# from container-side pip / pre-commit / huggingface routed under HOME=/workspace/COMPASS).
+/assets/
+/.cache/
+/.nv/
+/.nvidia-omniverse/
