@@ -20,19 +20,21 @@ non-interactive Python CLI. Reads credentials from environment variables
 (``WANDB_API_KEY``, ``HF_TOKEN``) with an opt-in ``--prompt`` fallback.
 
 Usage:
-    # Pre-built image, env vars already exported
+    # Pre-built image, env vars already exported. The X-Mobility base
+    # checkpoint and the COMPASS USDs are downloaded inside the workflow
+    # from huggingface.co/nvidia/X-Mobility and huggingface.co/nvidia/COMPASS
+    # respectively, so no --base-policy-ckpt flag is needed.
     python osmo/run_osmo.py train \\
         --experiment-name pilot \\
-        --wandb-project compass_train \\
-        --base-policy-ckpt my-org/my-project/x_mobility:v1 \\
+        --wandb-project compass-rl \\
         --image nvcr.io/<org>/compass_pilot:<tag>
 
     # Build+push the image automatically
     export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
-    python osmo/run_osmo.py train --experiment-name pilot --wandb-project compass_train
+    python osmo/run_osmo.py train --experiment-name pilot --wandb-project compass-rl
 
     # Inspect the would-be submit command without executing it
-    python osmo/run_osmo.py train --experiment-name pilot --wandb-project compass_train \\
+    python osmo/run_osmo.py train --experiment-name pilot --wandb-project compass-rl \\
         --image nvcr.io/<org>/img:tag --dry-run
 
 See https://nvlabs.github.io/COMPASS/docs/osmo.html for the full prerequisites
@@ -58,15 +60,6 @@ SUBCOMMAND_CONFIG = {
     "record": ("rl_es_record_workflow.yaml", "docker/Dockerfile.rl"),
     "distill": ("distillation_train_workflow.yaml", "docker/Dockerfile.distillation"),
 }
-
-# Default wandb project per subcommand (overridable with --wandb-project).
-DEFAULT_WANDB_PROJECT = {
-    "train": "compass_rl_enhance",
-    "eval": "compass_rl_enhance",
-    "record": "compass_rl_enhance_record",
-    "distill": "compass_train",
-}
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -95,10 +88,8 @@ def parse_args():
 
     train = sub.add_parser("train", help="Submit residual RL training.")
     add_common(train)
-    train.add_argument("--wandb-project", default=DEFAULT_WANDB_PROJECT["train"])
-    train.add_argument("--base-policy-ckpt",
-                       default="",
-                       help="wandb artifact for the X-Mobility base-policy checkpoint.")
+    train.add_argument("--wandb-project", required=True,
+                       help="wandb project to log into (e.g. compass-rl).")
     train.add_argument("--resume-ckpt",
                        default="",
                        help="wandb artifact for resuming from a prior residual checkpoint.")
@@ -108,13 +99,11 @@ def parse_args():
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
-    evl.add_argument("--wandb-project", default=DEFAULT_WANDB_PROJECT["eval"])
+    evl.add_argument("--wandb-project", required=True,
+                     help="wandb project to log into (e.g. compass-rl).")
     evl.add_argument("--checkpoint",
                      required=True,
                      help="wandb artifact for the residual checkpoint to evaluate.")
-    evl.add_argument("--base-policy-ckpt",
-                     default="",
-                     help="wandb artifact for the X-Mobility base-policy checkpoint.")
     evl.add_argument("--distillation-ckpt",
                      default="",
                      help="wandb artifact for an optional distillation checkpoint.")
@@ -129,13 +118,11 @@ def parse_args():
     rec.add_argument("--dataset-name",
                      required=True,
                      help="OSMO output dataset name for recorded specialist data.")
-    rec.add_argument("--base-policy-ckpt",
-                     default="",
-                     help="wandb artifact for the X-Mobility base-policy checkpoint.")
 
     dis = sub.add_parser("distill", help="Submit generalist distillation training.")
     add_common(dis)
-    dis.add_argument("--wandb-project", default=DEFAULT_WANDB_PROJECT["distill"])
+    dis.add_argument("--wandb-project", required=True,
+                     help="wandb project to log into (e.g. compass-distill).")
     dis.add_argument("--dataset-name",
                      required=True,
                      help="OSMO input dataset name (specialist rollouts).")
@@ -195,7 +182,6 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,
         "hf_token": hf_token,
-        "base_policy_ckpt_artifact": args.base_policy_ckpt,
         "resume_ckpt_artifact": args.resume_ckpt,
         "no_residual": "1" if args.no_residual else "",
     }
@@ -211,7 +197,6 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,
         "hf_token": hf_token,
-        "base_policy_ckpt_artifact": args.base_policy_ckpt,
         "checkpoint_artifact": args.checkpoint,
         "distillation_ckpt_artifact": args.distillation_ckpt,
         "no_residual": "1" if args.no_residual else "",
@@ -228,7 +213,6 @@ def cmd_record(args, image: str, wandb_key: str, hf_token: str) -> None:
         "image": image,
         "wandb_api_key": wandb_key,
         "hf_token": hf_token,
-        "base_policy_ckpt_artifact": args.base_policy_ckpt,
         "dataset_name": args.dataset_name,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)

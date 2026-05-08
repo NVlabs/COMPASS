@@ -17,6 +17,7 @@
 | 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
 | 7 | Docker-as-venv dev environment (`docker/run.sh` + `docker/activate`) | P1 | 🟡 | @liuw |
+| 8 | Pre-release leak audit + sanitization | P0 | 🟡 | @liuw |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
 
@@ -183,6 +184,23 @@ Quality-of-life: cut first-time UX from "30–60 min, 6 manual steps" to **"3 co
 
 **Branch:** `liuw/dev_environment` (off `liuw/auto_omap_from_usd`, latest in the stack).
 **Status:** files written; verification + commit pending.
+
+## 8. Pre-release leak audit + sanitization — P0
+
+Scrub all internal-only references before tagging 2.0. Inventory in the
+planning round; the meaningful work is in the OSMO entry script.
+
+- [x] OSMO workflows: replace `groot_mobility_rl_es_usds` dataset input with HF download `nvidia/COMPASS / compass_usds.zip` (3 YAMLs)
+- [x] OSMO workflows: replace `wandb artifact get …base_policy_ckpt…` with HF download `nvidia/X-Mobility / x_mobility-nav2-semantic_action_path.ckpt` (3 YAMLs)
+- [x] `osmo/run_osmo.py`: drop `nvidia-isaac` wandb-project defaults (`compass_rl_enhance`, `afm_train`); make `--wandb-project` required; drop `--base-policy-ckpt` flag (workflow now hardcodes the HF source)
+- [x] Update `docs/handbook/osmo.md` to reflect HF-sourced assets + required `--wandb-project`
+- [ ] `ros2_deployment/compass_navigator/setup.py`: review maintainer attribution (flag for @liuw; team alias preferred)
+- [ ] OSMO smoke test: resubmit `compass_rl_es_g1_official` with the rebuilt image; confirm HF download steps succeed and training reaches first PPO iter
+- [ ] Repo-wide grep gate: `grep -rnE "groot_mobility_rl_es_usds|nvidia-isaac/|afm_train" --include='*.py' --include='*.sh' --include='*.yaml' --include='*.gin' --include='*.html' .` returns no live-source hits
+- [ ] Distill `release_tracker.md` + `dev_env_plan.md` into `CHANGELOG.md` and remove from the repo at tag time (existing gate row)
+- [ ] PR: <link>
+
+**Branch:** `liuw/sanitize_for_public` (off `liuw/docs_site`, latest in the stack).
 
 ## Pre-release gates
 

@@ -45,17 +45,23 @@ workflow:
         # Generate your W&B API key: https://wandb.ai/authorize
         export WANDB_API_KEY={{wandb_api_key}}
 
-        # Copy the USDs to desired place
-        echo "Preparing USD files"
-        cp -r {{input:0}}/groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
+        # Download and unpack the COMPASS USDs from HuggingFace.
+        echo "Downloading compass_usds.zip from huggingface.co/nvidia/COMPASS"
+        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+            download nvidia/COMPASS compass_usds.zip --local-dir ./
+        unzip -q -o compass_usds.zip
+        mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
+        rm -rf groot_mobility_rl_es_usds compass_usds.zip
 
         # Create directory to store the training outputs.
         OUTPUT_DIR="{{output}}/outputs"
         mkdir -p $OUTPUT_DIR
 
-        # Download base policy.
-        echo "Downloading base policy checkpoint: {{base_policy_ckpt_artifact}}"
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m wandb artifact get {{base_policy_ckpt_artifact}} --root ./
+        # Download X-Mobility base-policy checkpoint from HuggingFace.
+        echo "Downloading X-Mobility checkpoint from huggingface.co/nvidia/X-Mobility"
+        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+            download nvidia/X-Mobility x_mobility-nav2-semantic_action_path.ckpt --local-dir ./
+        mv x_mobility-nav2-semantic_action_path.ckpt model.ckpt
 
         # Download resume checkpoint if provided.
         RESUME_CKPT_ARTIFACT={{resume_ckpt_artifact}}
@@ -100,13 +106,8 @@ workflow:
         }
       path: /tmp/config.json
 
-    inputs:
-    - dataset:
-        name: groot_mobility_rl_es_usds
-
 default-values:
   image: ""
-  base_policy_ckpt_artifact: ""
   workflow_name: compass_rl_es
   no_residual: ""
   resume_ckpt_artifact: ""
