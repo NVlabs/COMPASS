@@ -18,6 +18,7 @@
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
 | 7 | Docker-as-venv dev environment (`docker/run.sh` + `docker/activate`) | P1 | 🟡 | @liuw |
 | 8 | Pre-release leak audit + sanitization | P0 | 🟡 | @liuw |
+| 9 | CI/CD setup + dependency pinning | P1 | 🟡 | @liuw |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
 
@@ -201,6 +202,18 @@ planning round; the meaningful work is in the OSMO entry script.
 - [ ] PR: <link>
 
 **Branch:** `liuw/sanitize_for_public` (off `liuw/docs_site`, latest in the stack).
+
+## 9. CI/CD setup + dependency pinning — P1
+
+Bring the public repo up to a "first-line" CI posture before tagging:
+
+- [x] Add `.github/workflows/pre-commit.yml` (yapf / pylint / nbstripout / clang-format / large-files / trailing-whitespace / EOF / requirements-txt-fixer)
+- [x] Pin `requirements.txt` to versions verified inside `compass-rl:latest` (the image used for the just-passed OSMO smoke). 17 unpinned → 17 pinned; `diffusers==0.29.2` was already pinned.
+- [ ] First run of the workflow on PR-9: confirm pre-commit passes `--all-files` against the current branch. If legacy violations surface, fix in a follow-up commit on the same branch.
+- [ ] Decide later whether to add a Sphinx-handbook `linkcheck` job (out of scope for now; tracked under #6 docs).
+- [ ] PR: <link>
+
+**Branch:** `liuw/ci_setup` (off `liuw/sanitize_for_public`, latest in the stack).
 
 ## Pre-release gates
 

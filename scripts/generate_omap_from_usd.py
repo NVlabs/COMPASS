@@ -32,13 +32,12 @@ where ``OccupancyMapCollisionChecker``'s sibling-fallback looks first.
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 # Initialize Isaac Sim before importing pxr / omni.physx.
 # Match the headless-boot pattern used by .claude/skills/compass/scripts/sage10k_to_usd.py.
-from isaacsim import SimulationApp  # pylint: disable=import-error
+from isaacsim import SimulationApp    # pylint: disable=import-error
 
 _app = SimulationApp({"headless": True})
 
@@ -56,7 +55,7 @@ _OMAP_EXT_NAME = "isaacsim.asset.gen.omap"
 _ext_manager = omni.kit.app.get_app().get_extension_manager()
 _ext_manager.set_extension_enabled_immediate(_OMAP_EXT_NAME, True)
 
-from isaacsim.asset.gen.omap.bindings import _omap
+from isaacsim.asset.gen.omap.bindings import _omap    # pylint: disable=ungrouped-imports
 from pxr import Sdf, Usd, UsdGeom, UsdPhysics
 
 # Buffer values written by Generator.update_settings(...) below.
@@ -182,8 +181,7 @@ def buffer_to_grayscale_png(buffer, dims) -> np.ndarray:
     expected = dims[0] * dims[1]
     if arr.size != expected:
         raise RuntimeError(
-            f"Buffer size {arr.size} != dims[0]*dims[1] = {expected} ({dims[0]}x{dims[1]})"
-        )
+            f"Buffer size {arr.size} != dims[0]*dims[1] = {expected} ({dims[0]}x{dims[1]})")
     grid = arr.reshape((dims[1], dims[0]))    # (H, W)
     img = np.full_like(grid, PNG_UNKNOWN, dtype=np.uint8)
     img[grid == OCCUPIED_VALUE] = PNG_OCCUPIED

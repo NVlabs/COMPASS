@@ -74,7 +74,8 @@ class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
         num_resample_trials = 0
         while num_resample_trials < self.cfg.max_resample_trial:
             # Obtain origins for the robots
-            self.pos_command_w[resample_env_ids] = wp.to_torch(self.robot.data.root_pos_w)[resample_env_ids]
+            self.pos_command_w[resample_env_ids] = wp.to_torch(
+                self.robot.data.root_pos_w)[resample_env_ids]
             # Offset the position command by the current root position
             r = torch.empty(len(resample_env_ids), device=self.device)
             # Randomize the position

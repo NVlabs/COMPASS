@@ -61,6 +61,7 @@ SUBCOMMAND_CONFIG = {
     "distill": ("distillation_train_workflow.yaml", "docker/Dockerfile.distillation"),
 }
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Submit a COMPASS workflow to OSMO.",
@@ -72,9 +73,10 @@ def parse_args():
         sp.add_argument("--experiment-name",
                         required=True,
                         help="Short identifier; used in workflow_name and image tag.")
-        sp.add_argument("--image",
-                        default="",
-                        help="Pre-built docker image. If empty, build+push using --registry-prefix.")
+        sp.add_argument(
+            "--image",
+            default="",
+            help="Pre-built docker image. If empty, build+push using --registry-prefix.")
         sp.add_argument("--registry-prefix",
                         default=os.environ.get("COMPASS_OSMO_REGISTRY", ""),
                         help="Registry prefix for build+push (e.g. nvcr.io/<org>/<team>); "
@@ -88,7 +90,8 @@ def parse_args():
 
     train = sub.add_parser("train", help="Submit residual RL training.")
     add_common(train)
-    train.add_argument("--wandb-project", required=True,
+    train.add_argument("--wandb-project",
+                       required=True,
                        help="wandb project to log into (e.g. compass-rl).")
     train.add_argument("--resume-ckpt",
                        default="",
@@ -99,7 +102,8 @@ def parse_args():
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
-    evl.add_argument("--wandb-project", required=True,
+    evl.add_argument("--wandb-project",
+                     required=True,
                      help="wandb project to log into (e.g. compass-rl).")
     evl.add_argument("--checkpoint",
                      required=True,
@@ -121,7 +125,8 @@ def parse_args():
 
     dis = sub.add_parser("distill", help="Submit generalist distillation training.")
     add_common(dis)
-    dis.add_argument("--wandb-project", required=True,
+    dis.add_argument("--wandb-project",
+                     required=True,
                      help="wandb project to log into (e.g. compass-distill).")
     dis.add_argument("--dataset-name",
                      required=True,
@@ -219,7 +224,7 @@ def cmd_record(args, image: str, wandb_key: str, hf_token: str) -> None:
 
 
 def cmd_distill(args, image: str, wandb_key: str, hf_token: str) -> None:
-    del hf_token  # distillation workflow doesn't need HF auth
+    del hf_token    # distillation workflow doesn't need HF auth
     yaml_path = WORKFLOWS_DIR / SUBCOMMAND_CONFIG["distill"][0]
     set_args = {
         "workflow_name": f"compass_distillation_{args.experiment_name}",

@@ -1,12 +1,23 @@
 # Build the COMPASS docs site (academic landing + Sphinx handbook) and deploy
-# it to GitHub Pages on every push to main that touches docs/ or this workflow.
+# it to GitHub Pages.
 #
-# Repo settings → Pages → Source must be "GitHub Actions" (not "Deploy from a
-# branch") for this to take over from the legacy gh_page branch.
+# Triggers:
+#   - pull_request touching docs/ or this workflow -> build only (validates
+#     `make html` -W and uploads the rendered _site/ as an artifact reviewers
+#     can download from the run page).
+#   - push to main touching docs/ or this workflow -> build + deploy.
+#   - workflow_dispatch -> build + deploy on demand (any branch).
+#
+# Repo settings -> Pages -> Source must be "GitHub Actions" (not "Deploy from
+# a branch") for this to take over from the legacy gh_page branch.
 
 name: Build and deploy docs
 
 on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
   push:
     branches: [main]
     paths:
@@ -19,16 +30,9 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -67,6 +71,20 @@ jobs:
         with:
           path: _site
 
+  deploy:
+    # Only deploy on push to main or manual dispatch; PR builds stop after
+    # the artifact upload above so the PR check validates the build without
+    # touching the live Pages site.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4

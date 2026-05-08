@@ -158,7 +158,7 @@
             As robots are increasingly deployed in diverse application domains, enabling robust mobility across different embodiments has become a critical challenge. Classical mobility stacks, though effective on specific platforms, require extensive per-robot tuning and do not scale easily to new embodiments. Learning-based approaches, such as imitation learning (IL), offer alternatives, but face significant limitations on the need for high-quality demonstrations for each embodiment.
           </p>
           <p>
-            To address these challenges, we introduce COMPASS, a unified framework that enables scalable cross-embodiment mobility using expert demonstrations from only a single embodiment. We first pre-train a mobility policy on a single robot using IL, combining a world model with a policy model. We then apply residual reinforcement learning (RL) to efficiently adapt this policy to diverse embodiments through corrective refinements. Finally, we distill specialist policies into a single generalist policy conditioned on an embodiment embedding vector. This design significantly reduces the burden of collecting data while enabling robust generalization across a wide range of robot designs. Our experiments demonstrate that COMPASS scales effectively across diverse robot platforms while maintaining adaptability to various environment configurations, achieving a generalist policy with a success rate approximately 5X higher than the pre-trained IL policy, and further demonstrates zero-shot sim-to-real transfer. 
+            To address these challenges, we introduce COMPASS, a unified framework that enables scalable cross-embodiment mobility using expert demonstrations from only a single embodiment. We first pre-train a mobility policy on a single robot using IL, combining a world model with a policy model. We then apply residual reinforcement learning (RL) to efficiently adapt this policy to diverse embodiments through corrective refinements. Finally, we distill specialist policies into a single generalist policy conditioned on an embodiment embedding vector. This design significantly reduces the burden of collecting data while enabling robust generalization across a wide range of robot designs. Our experiments demonstrate that COMPASS scales effectively across diverse robot platforms while maintaining adaptability to various environment configurations, achieving a generalist policy with a success rate approximately 5X higher than the pre-trained IL policy, and further demonstrates zero-shot sim-to-real transfer.
           </p>
         </div>
       </div>
@@ -173,7 +173,7 @@
       <div class="columns is-centered">
         <div class="column is-full-width">
           <h2 class="title is-3">Method</h2>
-          
+
           <!-- Method figure -->
           <div class="content has-text-centered">
             <div class="columns is-centered">
@@ -182,7 +182,7 @@
               </div>
             </div>
           </div>
-  
+
           <!-- Method description -->
           <div class="content has-text-justified">
             <p>
@@ -204,7 +204,7 @@
   </section>
 
 
-  
+
 <section class="section">
   <div class="container is-max-desktop">
     <!-- Cross-embodiment Introduction -->

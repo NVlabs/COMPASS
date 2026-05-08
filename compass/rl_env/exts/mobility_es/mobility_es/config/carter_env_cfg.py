@@ -33,8 +33,7 @@ from mobility_es.mdp.action.non_holonomic_perfect_control_action import NonHolon
 class CarterActionsCfg:
     """Action specifications for the MDP."""
 
-    drive_joints = ActionTermCfg(class_type=NonHolonomicPerfectControlAction,
-                                     asset_name="robot")
+    drive_joints = ActionTermCfg(class_type=NonHolonomicPerfectControlAction, asset_name="robot")
 
 
 @configclass

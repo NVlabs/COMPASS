@@ -83,8 +83,8 @@ class NonHolonomicPerfectControlAction(ActionTerm):
 
         # Convert new yaw to quaternion (rotation around z-axis only, xyzw convention)
         new_quat = torch.zeros_like(quat)
-        new_quat[:, 2] = torch.sin(new_yaw / 2)  # z component
-        new_quat[:, 3] = torch.cos(new_yaw / 2)  # w component
+        new_quat[:, 2] = torch.sin(new_yaw / 2)    # z component
+        new_quat[:, 3] = torch.cos(new_yaw / 2)    # w component
 
         # Write new pose and velocity separately (root_state_w API removed in IsaacLab 3.0)
         new_pose = torch.cat([pos, new_quat], dim=-1)
@@ -95,7 +95,8 @@ class NonHolonomicPerfectControlAction(ActionTerm):
             torch.zeros_like(angular_z),
             torch.zeros_like(angular_z),
             angular_z,
-        ], dim=1)
+        ],
+                              dim=1)
         self._asset.write_root_pose_to_sim_index(root_pose=new_pose)
         self._asset.write_root_velocity_to_sim_index(root_velocity=new_vel)
 

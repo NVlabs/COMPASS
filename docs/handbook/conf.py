@@ -40,17 +40,17 @@ extensions = [
     "sphinxcontrib.mermaid",
 ]
 
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", ".venv", "venv"]
 
 # ---------------------------------------------------------------------------
 # MyST (markdown) configuration
 # ---------------------------------------------------------------------------
 
 myst_enable_extensions = [
-    "colon_fence",     # ::: directive blocks
-    "deflist",         # definition lists
-    "fieldlist",       # field lists
-    "tasklist",        # GitHub-style task lists
+    "colon_fence",    # ::: directive blocks
+    "deflist",    # definition lists
+    "fieldlist",    # field lists
+    "tasklist",    # GitHub-style task lists
     "attrs_inline",    # {.class} inline attribute syntax
 ]
 myst_fence_as_directive = {"mermaid"}
@@ -80,7 +80,9 @@ html_title = f"COMPASS Handbook"
 html_show_sphinx = False
 html_theme_options = {
     "github_url": "https://github.com/NVlabs/COMPASS",
-    "copyright_override": {"start": 2025},
+    "copyright_override": {
+        "start": 2025
+    },
     "pygments_light_style": "tango",
     "pygments_dark_style": "monokai",
 }
