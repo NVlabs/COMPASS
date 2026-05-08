@@ -237,6 +237,9 @@ Refresh the existing `compass` skill for the new docker-as-venv flow (#7) and ad
 ## Pre-release gates
 
 - [ ] **No-regression benchmark** — run all supported embodiments × scenes on `main` post-merge, compare success rate / SPL / collision rate to 1.5.0 baselines, post results in this tracker
+  - [ ] Sanitize and land internal `benchmark.py` (113 lines; hardcodes `nvcr.io/nvstaging/isaac-amr/groot_mobility_rl_enhance` registry + `afm_rl_enhance` defaults). Mirror the #1 / #8 sanitization pattern: drop internal registry, drop wandb-project defaults, accept `--registry-prefix` like `osmo/run_osmo.py`. Suggested landing path: `osmo/run_benchmark.py` (next to `run_osmo.py`).
+  - [ ] Define the regression matrix: which embodiments × scenes × seeds, with what success/SPL/collision thresholds vs the v1.5.0 baseline.
+  - [ ] Capture baseline numbers from v1.5.0 (or last known-good run) into this file before kicking off the new run.
 - [ ] All P0 items 🟢
 - [ ] CHANGELOG.md `[2.0.0]` entry drafted (Added / Changed / Fixed / Removed)
 - [ ] Version bump committed
