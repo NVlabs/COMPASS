@@ -46,6 +46,19 @@ class OccupancyMapCollisionChecker:
                 yaml_file_path = val
                 break
 
+        # Fallback: when OMAP_PATHS has no entry for the scene, look for an
+        # auto-generated map at <usd_dir>/omap/occupancy_map.yaml — this is
+        # where scripts/generate_omap_from_usd.py emits its output by default.
+        # Skipped when the scene uses MultiUsdFileCfg (no single USD path).
+        if yaml_file_path is None:
+            spawn_cfg = getattr(cfg.environment, "spawn", None)
+            usd_path = getattr(spawn_cfg, "usd_path", None) if spawn_cfg is not None else None
+            if isinstance(usd_path, str) and usd_path:
+                candidate = os.path.join(os.path.dirname(usd_path), "omap", "occupancy_map.yaml")
+                if os.path.exists(candidate):
+                    yaml_file_path = candidate
+                    print(f"Auto-discovered omap sibling of USD: {candidate}")
+
         if yaml_file_path and os.path.exists(yaml_file_path):
             print(f'Loaded omap for env {env_prim_path}')
             self._load_grid_map(yaml_file_path)

@@ -14,7 +14,7 @@
 | 1 | OSMO code migration (training runnable on OSMO) | P0 | ⬜ | TBD |
 | 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | ⬜ | @samc + @liuw |
 | 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | ⬜ | TBD |
-| 5 | Auto OMap generation from USDs | P1 | ⬜ | TBD |
+| 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | ⬜ | TBD |
 | 7 | Docker-driven dev environment (`workflow/run.sh`) | P1 | ⬜ | TBD |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
@@ -131,12 +131,19 @@ Replace the manual occupancy-map authoring step with a USD-derived generator so 
 
 > **Relationship with #2&3:** Complementary, not overlapping. The NuRec branch's `occupancy_map.py` change is precomputation + origin convention (loads pre-baked YAML faster), not USD generation. #5 is genuinely separate work that produces the YAML automatically from a USD.
 
-- [ ] Add CLI/script (e.g., `scripts/generate_omap_from_usd.py`) that produces the omap YAML directly from a USD scene
-- [ ] Update `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py` to consume the auto-generated YAML (no breaking change to `OMAP_PATHS` if avoidable)
-- [ ] Regenerate OMaps for all bundled scenes; commit YAML or document the one-line regeneration command
-- [ ] Update `compass/rl_env/README.md` to point at the auto-generation flow as the default
+- [x] Add CLI/script `scripts/generate_omap_from_usd.py` that produces the omap PNG+YAML directly from a USD scene (wraps `isaacsim.asset.gen.omap.bindings._omap.Generator`)
+- [x] Update `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py` so a scene without an `OMAP_PATHS` entry auto-discovers `<usd_dir>/omap/occupancy_map.yaml` (no breaking change to existing entries)
+- [x] Update `compass/rl_env/README.md` and `.claude/skills/compass/SKILL.md` to point at the auto-generation flow
+- [x] Verify generation + collision-free sampling on representative USDs:
+  - `office.usd` — ✅ 200/200 free samples in unoccupied regions
+  - `combined_simple_warehouse/combined.usd` (default training scene) — ✅ 253/300 free samples; visually free dots avoid obstacles
+  - `sample_small_footprint_one_rack_obst_sdg.usd` — ✅ 145/300 free samples; same
+- [ ] Regenerate OMaps for all bundled scenes (optional follow-up; current loader auto-discovers when no `OMAP_PATHS` entry)
 - [ ] Measure training-throughput delta vs. manual OMaps; record in benchmark report
 - [ ] PR: <link>
+
+**Branch:** `liuw/auto_omap_from_usd` (off `liuw/agentic_skills_migration`)
+**Key fix:** wait on `omni.usd.get_context().get_stage_loading_status()` until `to_load == 0` before invoking `generate2d()` — without this, kit crashes on USDs with external references (e.g. `combined_simple_warehouse` referencing `galileo_lab.usd`) when the omap generator queries fabric for prims whose references are still resolving. Mirrors the pattern Isaac Sim's own `isaacsim.asset.gen.omap` tests use.
 
 ## 6. GitHub Pages docs site — P1
 

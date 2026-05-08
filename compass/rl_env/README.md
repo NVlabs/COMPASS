@@ -88,12 +88,16 @@ To add a new scene, follow these steps:
 
 
 2. **Add Occupancy Map [Optional]**:
-   - We use occupancy map for collision-free pose sampling, while optional, we recommend adding the occupancy map for the new scene to improve sampling efficiency.
-   - For occupancy map generation, follow this [insturction](https://docs.omniverse.nvidia.com/isaacsim/latest/features/ext_omni_isaac_occupancy_map.html) to create the occupancy map with the new scene USD file in Isaac Sim. Make sure to rotate the occupancy map properly to match the scene orientation and set the origin as the top-left of the image in the occupancy_map.yaml file.
+   - We use an occupancy map for collision-free pose sampling. It's optional but recommended for improving sampling efficiency, especially in tight scenes.
+   - Generate the map directly from the scene USD with the bundled CLI:
+     ```bash
+     ${ISAACLAB_PATH}/isaaclab.sh -p scripts/generate_omap_from_usd.py path/to/scene.usd
+     ```
+     By default this writes `<scene>.png` and `occupancy_map.yaml` to `<usd_dir>/omap/`. Use `--cell-size`, `--z-min`/`--z-max`, `--bounds`, or `--out-dir` to override the defaults; see `--help` for the full flag list.
+   - You can register the YAML path explicitly in `OMAP_PATHS` in [exts/mobility_es/mobility_es/config/environments.py](exts/mobility_es/mobility_es/config/environments.py), but it's not required: when the scene has no entry, the collision checker falls back to looking for an `omap/occupancy_map.yaml` next to the scene's USD — which is exactly where the generator drops it.
+   - The legacy interactive flow via Isaac Sim's [occupancy-map UI](https://docs.omniverse.nvidia.com/isaacsim/latest/features/ext_omni_isaac_occupancy_map.html) still works if you prefer authoring a map by hand. Save the YAML/PNG into the same `<usd_dir>/omap/` location and the loader will pick it up.
 
     ![Occupancy Map Example](../../images/omap_generation.png)
-
-   - Add the occupancy_map.yaml path in `OMAP_PATHS` in [exts/mobility_es/mobility_es/config/environments.py](exts/mobility_es/mobility_es/config/environments.py) with key as the scene name and value as the occupancy map yaml path.
 
 3. **Register and Verify Scene**:
    - Import your new scene in the play.py script [scripts/play.py](scripts/play.py)
