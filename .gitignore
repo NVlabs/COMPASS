@@ -43,3 +43,6 @@ ros2_deployment/assets/
 /.cache/
 /.nv/
 /.nvidia-omniverse/
+
+# Sphinx handbook local build output (CI publishes from a separate _site/).
+/docs/handbook/_build/

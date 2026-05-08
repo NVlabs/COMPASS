@@ -15,7 +15,7 @@
 | 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | ⬜ | @samc + @liuw |
 | 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | ⬜ | TBD |
 | 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
-| 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | ⬜ | TBD |
+| 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
 | 7 | Docker-as-venv dev environment (`docker/run.sh` + `docker/activate`) | P1 | 🟡 | @liuw |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
@@ -74,7 +74,7 @@ Foundation. No new features; pure 2.1 → 3.0 compat. Off `main`.
 
 - [ ] Extract A-only hunks from commit `3e6dcd9`
 - [ ] Survey Isaac Lab 2.1 → 3.0 release notes / migration guide; confirm branch covers them
-- [ ] Update version pins: README badges, `compass/rl_env/README.md`
+- [ ] Update version pins: README badges, `docs/handbook/extending.md` (bare-metal install section)
 - [ ] Update `docker/Dockerfile.distillation` base image if needed (`Dockerfile.rl` already on branch)
 - [ ] **Reviewer spot-check**: quaternion convention flip across all rows of `environments.py` (wxyz → xyzw) — confirm no Y-up vs Z-up assumption breaks
 - [ ] Re-validate USD assets load under 3.0 (`compass/rl_env/exts/mobility_es/mobility_es/usd/`)
@@ -89,7 +89,7 @@ Off PR-1. NuRec asset support, the `occupancy_map.py` refactor it depends on, an
 - [ ] Cherry-pick `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py` refactor (origin convention + `precompute_valid_poses`)
 - [ ] **Cleanup**: collapse duplicated `run.py` lines 244-246 / 247-250
 - [ ] **Cleanup**: register `'nova_carter-galileo'` as a *new* `EnvSceneAssetCfgMap` key alongside the existing `warehouse_multi_rack` (do not overwrite — fixes commit `86f9664`)
-- [ ] Add NuRec asset section to `compass/rl_env/README.md`
+- [ ] Add NuRec asset section to `docs/handbook/extending.md` (or a new handbook page if the section grows)
 - [ ] Add NuRec entry under "External assets that must be downloaded manually" in `README.md`
 - [ ] Smoke test: training run with NuRec asset
 - [ ] Smoke test: confirm a non-NuRec run on a `warehouse_multi_rack` scene still works (regression check)
@@ -127,7 +127,7 @@ Migrate the agentic-skills tooling that automates training-loop execution from t
 
 ## 5. Auto OMap generation from USDs — P1
 
-Replace the manual occupancy-map authoring step with a USD-derived generator so SAGE-driven training (and any new scene) can ramp up without hand-tuned omaps. The current manual flow is documented in `compass/rl_env/README.md:94-96` and consumed by `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py`.
+Replace the manual occupancy-map authoring step with a USD-derived generator so SAGE-driven training (and any new scene) can ramp up without hand-tuned omaps. The auto-gen flow is documented at https://nvlabs.github.io/COMPASS/docs/omap.html and consumed by `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py`.
 
 > **Relationship with #2&3:** Complementary, not overlapping. The NuRec branch's `occupancy_map.py` change is precomputation + origin convention (loads pre-baked YAML faster), not USD generation. #5 is genuinely separate work that produces the YAML automatically from a USD.
 
@@ -147,14 +147,23 @@ Replace the manual occupancy-map authoring step with a USD-derived generator so 
 
 ## 6. GitHub Pages docs site — P1
 
-End-to-end workflow docs from X-Mobility install through COMPASS distillation and ROS2 deployment.
+End-to-end docs site auto-deployed from `main/docs/` via GitHub Actions. Academic landing stays at `nvlabs.github.io/COMPASS/`; new **Sphinx handbook with the NVIDIA theme** (matching `agentic_model_training/docs/` and the rest of NVIDIA OSS) serves at `nvlabs.github.io/COMPASS/docs/`. Replaces the hand-served `gh_page` branch.
 
-- [ ] Pick stack (MkDocs Material? Sphinx?) — confirm with team
-- [ ] Decide branch strategy (existing `gh_page` is the academic project page; create `gh-pages` for docs OR host docs at `/docs/`)
-- [ ] Outline: install → X-Mobility primer → specialists → distillation → export → ROS2 → OSMO + agentic skills (incl. SAGE) → API reference
-- [ ] Migrate existing README + `compass/rl_env/README.md` + `ros2_deployment/README.md` content into the site (don't duplicate, link)
-- [ ] Wire GitHub Actions to build & deploy on push to `main`
+- [x] Stack decided: **Sphinx 7.x + nvidia-sphinx-theme + myst-parser** (markdown survives; matches NVIDIA house style)
+- [x] Source location: `main/docs/` (so doc edits go through normal PRs); `gh_page` left as a frozen archive
+- [x] URL layout: academic at `/`, handbook at `/docs/`
+- [x] Migrate `gh_page` → `docs/project_page/` (264 files; mp4/png LFS-tracked, rest as Git blobs) — landed in commit `305c3a1`
+- [x] Add `docs/handbook/{conf.py, Makefile, requirements.txt, _static/, docs/}` with `{toctree}` nav (Installation / Workflows / Deployment / Reference)
+- [x] Transclude existing READMEs (Docker, OSMO, ROS2, mobility_es, CONTRIBUTING) via MyST `` ```{include} `` directives; no copy-paste of content
+- [x] Add Documentation CTA on academic landing (`docs/project_page/index.html` → `./docs/`)
+- [x] Wire `.github/workflows/docs.yml` (`make html` / `sphinx-build -W`, copy academic landing to root, deploy via `actions/deploy-pages@v4`)
+- [ ] Local build verification: `make html` runs clean; all 16 handbook pages render; both `/` and `/docs/` serve correctly from `_site/`
+- [ ] Repo settings: **Settings → Pages → Source = "GitHub Actions"** (one-time owner action; documented in PR description)
+- [ ] Push to main + watch first deploy succeed
 - [ ] PR: <link>
+
+**Branch:** `liuw/docs_site` (off `liuw/dev_environment`, latest in the stack).
+**Status:** files written; local Sphinx build pending; Pages source switch + push pending.
 
 ## 7. Docker-as-venv dev environment — P1
 

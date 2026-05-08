@@ -1,0 +1,8 @@
+sphinx>=7.0,<8.3
+myst-parser>=3.0.1
+nvidia-sphinx-theme>=0.0.8
+sphinx_copybutton>=0.5.2
+sphinx_design>=0.6.1
+sphinxcontrib-mermaid>=1.0.0
+sphinx-autobuild>=2024.0.0
+setuptools>=69

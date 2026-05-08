@@ -304,7 +304,7 @@ python osmo/run_osmo.py train \
     --base-policy-ckpt <wandb-artifact>
 ```
 
-For direct `osmo workflow submit` invocation (advanced), see [osmo/README.md](../../../osmo/README.md). Workflow YAMLs live in [osmo/workflows/](../../../osmo/workflows/).
+For direct `osmo workflow submit` invocation (advanced), see the [OSMO cloud submission](https://nvlabs.github.io/COMPASS/docs/osmo.html) handbook page. Workflow YAMLs live in [osmo/workflows/](../../../osmo/workflows/).
 
 ### Defaults
 | Parameter | Default | Source |

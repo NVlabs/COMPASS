@@ -35,7 +35,8 @@ Usage:
     python osmo/run_osmo.py train --experiment-name pilot --wandb-project compass_train \\
         --image nvcr.io/<org>/img:tag --dry-run
 
-See ``osmo/README.md`` for the full prerequisites and per-subcommand examples.
+See https://nvlabs.github.io/COMPASS/docs/osmo.html for the full prerequisites
+and per-subcommand examples.
 """
 
 import argparse

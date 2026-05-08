@@ -1,0 +1,72 @@
+# Build the COMPASS docs site (academic landing + Sphinx handbook) and deploy
+# it to GitHub Pages on every push to main that touches docs/ or this workflow.
+#
+# Repo settings → Pages → Source must be "GitHub Actions" (not "Deploy from a
+# branch") for this to take over from the legacy gh_page branch.
+
+name: Build and deploy docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          # The Bulma project page lives under docs/project_page/ with a
+          # handful of LFS-tracked images and videos. Pull them so they
+          # actually appear in the deployed site.
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Sphinx + nvidia-sphinx-theme + extensions
+        working-directory: docs/handbook
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build handbook (warnings -> errors)
+        working-directory: docs/handbook
+        run: make html
+
+      - name: Stage academic landing + handbook under _site/
+        run: |
+          mkdir -p _site
+          cp -r docs/project_page/. _site/
+          cp -r docs/handbook/_build/html _site/docs
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

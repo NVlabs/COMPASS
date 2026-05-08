@@ -1,0 +1,49 @@
+/* SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Light brand polish on top of nvidia-sphinx-theme. */
+
+:root {
+  --compass-card-radius: 0.9rem;
+  --compass-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --compass-card-border: rgba(127, 127, 127, 0.2);
+}
+
+/* sphinx-design grid cards on the landing page */
+.sd-card {
+  border-radius: var(--compass-card-radius);
+  border: 1px solid var(--compass-card-border);
+  box-shadow: var(--compass-card-shadow);
+  height: 100%;
+}
+
+.sd-card .sd-card-body {
+  padding: 1.15rem 1.2rem;
+}
+
+.sd-card .sd-card-title {
+  margin-bottom: 0.45rem;
+}
+
+/* Hero lead under the H1 on the landing */
+.hero-lead {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 66rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Inline pill chips for "Quick start", "Training", etc. */
+.workflow-pills {
+  margin: 1rem 0 1.4rem;
+}
+
+.workflow-pill {
+  display: inline-block;
+  margin: 0 0.5rem 0.5rem 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(118, 185, 0, 0.12);  /* NVIDIA green tint */
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
