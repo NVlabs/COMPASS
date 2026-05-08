@@ -99,6 +99,8 @@ def parse_args():
     train.add_argument("--no-residual",
                        action="store_true",
                        help="Skip the residual head (use base policy only).")
+    train.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
+    train.add_argument("--environment", default="", help="Override the gin-config environment.")
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
@@ -189,6 +191,8 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "hf_token": hf_token,
         "resume_ckpt_artifact": args.resume_ckpt,
         "no_residual": "1" if args.no_residual else "",
+        "embodiment": args.embodiment,
+        "environment": args.environment,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)
 

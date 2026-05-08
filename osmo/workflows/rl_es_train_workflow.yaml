@@ -74,6 +74,16 @@ workflow:
         # Launch training.
         TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c configs/train_config.gin --enable_cameras -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video"
 
+        EMBODIMENT={{embodiment}}
+        if [[ -n $EMBODIMENT ]]; then
+          TRAIN_CMD+=" --embodiment $EMBODIMENT"
+        fi
+
+        ENVIRONMENT={{environment}}
+        if [[ -n $ENVIRONMENT ]]; then
+          TRAIN_CMD+=" --environment $ENVIRONMENT"
+        fi
+
         NO_RESIDUAL={{no_residual}}
         if [[ -z $NO_RESIDUAL ]]; then
           TRAIN_CMD+=" -b ./model.ckpt"
@@ -94,6 +104,14 @@ workflow:
           EVAL_CMD+=" -b ./model.ckpt"
         fi
 
+        if [[ -n $EMBODIMENT ]]; then
+          EVAL_CMD+=" --embodiment $EMBODIMENT"
+        fi
+
+        if [[ -n $ENVIRONMENT ]]; then
+          EVAL_CMD+=" --environment $ENVIRONMENT"
+        fi
+
         echo $EVAL_CMD
         eval $EVAL_CMD
 
@@ -111,3 +129,5 @@ default-values:
   workflow_name: compass_rl_es
   no_residual: ""
   resume_ckpt_artifact: ""
+  embodiment: ""
+  environment: ""
