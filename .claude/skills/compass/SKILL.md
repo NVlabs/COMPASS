@@ -1,14 +1,12 @@
 ---
 name: compass
 description: >
-  End-to-end COMPASS robot navigation pipeline orchestrator. Handles SAGE-10k scene
-  search/download, USD conversion, COMPASS training environment setup, scene registration,
-  residual RL training, and evaluation. Use this skill whenever the user mentions COMPASS,
-  SAGE, robot navigation training, USD scene generation, residual RL, embodiment training
-  (carter/h1/spot/g1/digit), IsaacLab training, or wants to generate 3D environments for
-  robot training. Also triggers for: "train on a new scene", "set up sage", "generate a
-  warehouse", "evaluate a checkpoint", "run compass", "search sage-10k", or any navigation
-  policy training task.
+  Front-door for COMPASS — training, evaluation, SAGE scene workflows
+  (search / USD conversion / scene registration), and OSMO cloud
+  submission. Use whenever the user mentions training a policy, adding
+  a SAGE scene, evaluating a checkpoint, or running COMPASS in general.
+  For deploy / debug / onboarding-a-new-robot, see the specialty
+  siblings: compass-deploy, compass-debug, compass-newembodiment.
 allowed-tools:
   - Bash
   - Read
@@ -21,7 +19,7 @@ allowed-tools:
   - Agent
 ---
 
-You orchestrate the COMPASS robot navigation training pipeline — from scene search to trained policy. You're adaptive: interactive and explanatory during setup, autonomous and efficient for repeated operations like training runs.
+You orchestrate the COMPASS robot navigation training pipeline — from scene search to trained policy. Adapt to context: interactive and explanatory during setup, autonomous and efficient for repeated operations like training runs.
 
 COMPASS trains cross-embodiment navigation policies using residual RL on top of X-Mobility (a pretrained VLA). SAGE-10k provides 10,000 pre-generated indoor scenes across 50 room types.
 
@@ -31,7 +29,7 @@ This skill bundles two helper scripts in its own directory:
 - `scripts/sage10k_search.py` — search SAGE-10k dataset by text query
 - `scripts/sage10k_to_usd.py` — convert SAGE-10k scenes to USD (uses only Isaac Sim native APIs, no extra deps)
 
-The scripts are located relative to this skill's base directory. Use the full path when invoking them:
+Use the full path when invoking them:
 ```
 <SKILL_BASE_DIR>/scripts/sage10k_search.py
 <SKILL_BASE_DIR>/scripts/sage10k_to_usd.py
@@ -43,68 +41,70 @@ The scripts are located relative to this skill's base directory. Use the full pa
 |----------|---------|
 | **Search SAGE-10k** | User wants a scene from the SAGE-10k dataset (default for new scenes) |
 | **Setup COMPASS** | User wants to install COMPASS deps, or deps are missing when needed |
-| **Setup SAGE** | User wants full local SAGE installation for custom generation (rare) |
+| **Setup SAGE (local)** | User wants full local SAGE installation for custom generation (rare; see `references/setup-sage-local.md`) |
 | **Register Scene** | User has a USD file to add to COMPASS (auto-triggered after conversion) |
 | **Train** | User wants to run residual RL training on a scene |
 | **Evaluate** | User wants to evaluate a trained checkpoint |
 | **Full Pipeline** | User gives a scene description — chain: search SAGE-10k → download → convert USD → verify in viewer → register → preview train (num_envs=1, GUI) → full train |
 
-If the user gives a scene description like "a cluttered warehouse" or "bedroom", treat it as **Full Pipeline** using SAGE-10k search. Only use local SAGE if explicitly requested.
+If the user gives a scene description like "a cluttered warehouse" or "bedroom", treat it as **Full Pipeline** using SAGE-10k search. Use local SAGE only when the user explicitly asks for it.
 
-**IMPORTANT**: Before Train, Evaluate, or Full Pipeline, ALWAYS run the Prerequisites Check first. If anything is missing, auto-route to the relevant Setup step. Never assume the environment is ready.
+Before any of Train, Evaluate, or Full Pipeline, run the **Prerequisites Check** first. The cost of a stale check is a confusing CUDA error 30 minutes into a training run.
+
+## Specialty skills
+
+Some user intents are better handled by sibling skills. When the user's task fits one of these, **say so to the user and recommend the matching specialty** — don't try to handle it inside `compass`:
+
+| User intent | Specialty skill |
+|---|---|
+| Deploy a TRAINED checkpoint to a robot (ONNX → TRT → ROS2) | `/compass-deploy` |
+| Diagnose why training won't start, "what's wrong", quick health check | `/compass-debug` |
+| Add a new robot platform (cfg files, EmbodimentEnvCfgMap registration) | `/compass-newembodiment` |
+
+Tell the user the matching specialty and suggest they invoke it (or rephrase their ask so the auto-router picks it up). Don't programmatically invoke the sibling via the Skill tool — that adds latency and removes the user's ability to redirect.
 
 ---
 
 ## Prerequisites Check
 
-Run this before ANY operation. Use `dangerouslyDisableSandbox: true` for GPU commands. Run all checks in parallel where possible. Report what's ready and what's missing.
+Run this before any operation. The skill assumes the user has run `source ./docker/activate` (the docker-as-venv shim from the `docker/` subdir). Run all checks in parallel where possible. Report what's ready and what's missing.
 
 ```bash
-# Step 1: GPU (MUST use dangerouslyDisableSandbox: true)
+# Container running?
+./docker/run.sh status
+
+# Activated shell? `deactivate` is a shell function defined by ./docker/activate
+command -v deactivate >/dev/null && echo "shell: activated" || echo "shell: NOT activated — run: source ./docker/activate"
+
+# GPU (use dangerouslyDisableSandbox: true)
 nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader
 
-# Step 2-3: Conda env + Isaac Lab
-conda env list 2>/dev/null | grep -i isaac
-echo "ISAACLAB_PATH=$ISAACLAB_PATH"
-test -f "$ISAACLAB_PATH/isaaclab.sh" && echo "isaaclab.sh: OK" || echo "isaaclab.sh: MISSING"
-
-# Step 4: Base policy
-for p in ./model.ckpt ./x_mobility_ckpt/model.ckpt ~/afm_base_policy.ckpt; do
-  test -f "$p" && echo "Found base policy: $p"
-done
-
-# Step 5: USD assets
-ls compass/rl_env/exts/mobility_es/mobility_es/usd/ 2>/dev/null
+# Assets present
+test -f ./assets/x_mobility.ckpt && echo "x_mobility ckpt: OK ($(du -h ./assets/x_mobility.ckpt | cut -f1))"
+ls ./assets/usd/ 2>/dev/null | head -5
 ```
 
-Report summary, then proceed or guide setup for missing pieces.
+If anything fails, route to **Setup COMPASS**. If the user reports a vague "training won't start" issue, that's `compass-debug`'s job — recommend it.
 
 ---
 
 ## Execution Environment Rules
 
-These rules apply to ALL commands. Violating them causes failures.
+These rules apply to every command. Each one exists for a specific reason; the explanation matters more than the rule itself, because edge cases need judgment.
 
-1. **Conda env wrapper**: ALL `isaaclab.sh` and Isaac Sim Python commands MUST use:
-   ```bash
-   conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p ...
-   ```
-   Or for plain Python with Isaac Sim imports:
-   ```bash
-   conda run -n <ENV_NAME> python ...
-   ```
+1. **Activated-shell rule.** Every Python invocation runs inside a shell where the user has already done `source ./docker/activate`. Inside that shell, `python`, `pip`, `tensorboard`, etc. are shims that route into the COMPASS container automatically. The right command is just `python run.py …` — no Isaac Lab launcher prefix, no conda env wrapper. If `command -v deactivate` returns nothing, the shell isn't activated — pause and ask the user to source the activate script before continuing.
 
-2. **GPU access**: ALL GPU commands MUST use `dangerouslyDisableSandbox: true`. The Claude Code sandbox blocks NVIDIA driver access — without this flag, `nvidia-smi` fails and Isaac Sim cannot find CUDA.
+2. **GPU access needs `dangerouslyDisableSandbox: true`.** The Claude Code sandbox blocks NVIDIA driver access — without this flag, `nvidia-smi` fails and Isaac Sim can't find CUDA. This is a Claude Code concern, not a container concern, so it applies even though the GPU work happens inside the container.
 
-3. **Background execution**: Training and evaluation are long-running. Use `run_in_background: true` so the user isn't blocked. Note: `conda run` buffers stdout — check progress via log files instead:
+3. **Background execution for long jobs.** Training and evaluation can run for hours. Use `run_in_background: true` so the user isn't blocked. To check progress, look at log files instead of stdout (the shim forwards stdout but it's easy to miss when the run is backgrounded):
    ```bash
-   # Find latest log
+   # Find latest training log
    ls -t /tmp/isaaclab/logs/ | head -1
    # Or check the Kit log for errors
-   find /home/*/miniconda3/envs/*/lib/python*/site-packages/isaacsim/kit/logs/Kit -name "kit_*.log" -newer /tmp/isaaclab/logs/ 2>/dev/null
+   find ~/.local/share/ov/pkg/isaac-sim-* -name "kit_*.log" 2>/dev/null | head -1 | xargs tail -100
    ```
 
-4. **Killing processes**: When killing training, use `kill -9` on the Python process directly — the `conda run` wrapper may leave orphan processes:
+4. **Killing processes.** `kill -9 <PID>` of the python process. The shim forwards SIGTERM cleanly into the container, no orphan-conda-wrapper issues to worry about:
    ```bash
    ps aux | grep "run.py.*<scene>" | grep -v grep | awk '{print $2}' | xargs kill -9
    ```
@@ -113,67 +113,61 @@ These rules apply to ALL commands. Violating them causes failures.
 
 ## Setup COMPASS
 
-Skip steps already detected in Prerequisites Check.
+The new dev environment uses Docker as a venv: build the image once, download assets once, then activate. Three commands:
 
-### Step 1: Install Isaac Lab 3.0.0-beta1
 ```bash
-git clone https://github.com/isaac-sim/IsaacLab.git --branch v3.0.0-beta1
-cd IsaacLab && ./isaaclab.sh --install
-export ISAACLAB_PATH=/path/to/IsaacLab
+export HF_TOKEN=hf_xxx                  # https://huggingface.co/settings/tokens
+./docker/run.sh build                   # ~10 min cold build of compass-rl image
+./docker/run.sh assets                  # ~5 min: downloads compass_usds + x_mobility ckpt
+source ./docker/activate                # prompt becomes (compass-rl)
 ```
 
-### Step 2: Install COMPASS dependencies
-```bash
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -r requirements.txt
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install x_mobility/x_mobility-0.1.0-py3-none-any.whl
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -e compass/rl_env/exts/mobility_es/
-```
+After this, `python run.py …` (and `pip`, `tensorboard`, etc.) Just Work — they route to the container via `docker exec`. No conda env, no manual pip-install of requirements, no Isaac Lab clone. Assets land at `./assets/usd/` (built-in scenes) and `./assets/x_mobility.ckpt` (base policy), bind-mounted into the container at the same paths under `/workspace/COMPASS/`.
 
-### Step 3: Download base policy
-Ask user for existing checkpoint path, or download:
-```bash
-conda run -n <ENV_NAME> huggingface-cli login --token <HF_TOKEN>
-conda run -n <ENV_NAME> huggingface-cli download nvidia/X-Mobility --local-dir ./x_mobility_ckpt
-```
-
-### Step 4: Download USD assets
-Download `compass_usds.zip` from HuggingFace `nvidia/COMPASS`, extract to `compass/rl_env/exts/mobility_es/mobility_es/usd/`.
+Full reference: `docs/handbook/installation/docker.md`. If the user wants the bare-metal install (no Docker), point them at `docs/handbook/installation/bare-metal.md` — supported but slower to set up and not the recommended default.
 
 ---
 
-## Search SAGE-10k (Recommended for new scenes)
+## Search SAGE-10k (recommended for new scenes)
 
 The SAGE-10k dataset (`nvidia/SAGE-10k`) has 10,000 pre-generated indoor scenes across 50 room types. No SAGE installation needed.
 
 ### Step 1: Search for matching scenes
+
 ```bash
-conda run -n <ENV_NAME> python <SKILL_BASE_DIR>/scripts/sage10k_search.py "<USER_PROMPT>" --top 5 --sample-size 50
+python <SKILL_BASE_DIR>/scripts/sage10k_search.py "<USER_PROMPT>" --top 5 --sample-size 50
 ```
+
 First run builds a scene index from the HF API (cached afterward). Results show room type, style, object count, and description.
 
 ### Step 2: Present options to user
+
 Show top results. Let user pick one.
 
 ### Step 3: Download the selected scene
+
 ```bash
-# Download specific scene zip
 huggingface-cli download nvidia/SAGE-10k --repo-type dataset \
   --include "scenes/<zip_filename>" --local-dir ./sage_10k_cache
 
-# Extract
 mkdir -p ./sage_10k_scenes/<scene_name>
 unzip ./sage_10k_cache/scenes/<zip_filename> -d ./sage_10k_scenes/<scene_name>/
 ```
 
 ### Step 4: Convert to USD
-Use the bundled converter (only needs Isaac Sim native APIs — no extra deps):
+
+The bundled converter only needs Isaac Sim native APIs, no extra deps:
+
 ```bash
-# MUST use dangerouslyDisableSandbox: true
-conda run -n <ENV_NAME> python <SKILL_BASE_DIR>/scripts/sage10k_to_usd.py \
+# dangerouslyDisableSandbox: true (Isaac Sim needs GPU)
+python <SKILL_BASE_DIR>/scripts/sage10k_to_usd.py \
   ./sage_10k_scenes/<scene_name>/<layout_json> \
   ./compass/rl_env/exts/mobility_es/mobility_es/usd/<scene_name>/<scene_name>.usd
 ```
-This script:
+
+The output USD lives under the mobility_es extension directory because that's where `environments.py` expects to find it (the registered `USD_PATHS` dict resolves `../usd/<scene>/...` relative to the config/ subdir). Built-in COMPASS scenes from `./assets/usd/` are referenced separately; user-added SAGE scenes go here.
+
+The script:
 - Initializes Isaac Sim headless for `pxr` access
 - Parses PLY meshes with proper binary format (separate vertex/texcoord elements)
 - Scales objects to match layout dimensions
@@ -182,9 +176,11 @@ This script:
 - Sets all objects as static collision (appropriate for navigation training)
 
 ### Step 5: Verify USD in Isaac Sim viewer
-**ALWAYS** launch the Isaac Sim viewer after conversion so the user can visually verify the scene looks correct (geometry, collisions, textures) before proceeding. Use `dangerouslyDisableSandbox: true` and `run_in_background: true`:
+
+Launch the Isaac Sim viewer after conversion so the user can visually verify the scene looks correct (geometry, collisions, textures) before proceeding. Use `dangerouslyDisableSandbox: true` and `run_in_background: true`:
+
 ```bash
-conda run -n <ENV_NAME> python -c "
+python -c "
 from isaacsim import SimulationApp
 app = SimulationApp({'headless': False, 'width': 1280, 'height': 720})
 import omni
@@ -194,26 +190,28 @@ while app.is_running():
 app.close()
 " &
 ```
-Tell the user the viewer is open and to close it when they're done inspecting. Ask if the scene looks good before proceeding. Enable collision visualization via **Show > Physics > Colliders**.
+
+Tell the user the viewer is open and to close it when done. Suggest enabling **Show > Physics > Colliders** to inspect collision meshes. Ask if the scene looks correct before proceeding.
 
 ### Step 6: Register and train
+
 Proceed to **Register Scene** → **Train**.
 
 ---
 
 ## Register Scene
 
-Edit two files. Read each file first to find insertion points.
+Edit two files. Read each first to find the right insertion point — line numbers drift over time.
 
 ### File 1: `compass/rl_env/exts/mobility_es/mobility_es/config/environments.py`
 
-**Add to `USD_PATHS` dict:**
+Add to `USD_PATHS` dict:
 ```python
 '<SceneName>':
     os.path.join(os.path.dirname(__file__), "../usd/<scene_dir>/<scene_file>.usd"),
 ```
 
-**Add scene config at end of file:**
+Add scene config at end of file:
 ```python
 <scene_var> = EnvSceneAssetCfg(
     prim_path="{ENV_REGEX_NS}/<SceneName>",
@@ -234,11 +232,12 @@ Edit two files. Read each file first to find insertion points.
     env_spacing=20,
 )
 ```
-For SAGE-10k rooms (typically 4-6m), use `pose_sample_range` ±3m and `env_spacing` 20. For larger scenes, increase both.
+
+For SAGE-10k rooms (typically 4–6m), `pose_sample_range` ±3m and `env_spacing` 20 work well. Larger scenes need both bumped up proportionally.
 
 ### File 2: `run.py`
 
-**Add to `EnvSceneAssetCfgMap` (around line 118-128):**
+Add to `EnvSceneAssetCfgMap` (around line 118–128):
 ```python
 '<scene_var>': environments.<scene_var>,
 ```
@@ -247,37 +246,40 @@ For SAGE-10k rooms (typically 4-6m), use `pose_sample_range` ±3m and `env_spaci
 
 ## Train
 
-**Remember**: `conda run`, `dangerouslyDisableSandbox: true`.
+### Step 1: Preview training (always do this first)
 
-### Step 1: Preview training (ALWAYS do this first)
-**ALWAYS** start with a preview run: `--num_envs 1` WITHOUT `--headless`, so the user can verify the robot spawns correctly in the scene and the environment looks right. Use `run_in_background: true`:
+Launch with `--num_envs 1` and **without** `--headless`, so the user can verify the robot spawns correctly in the scene and the environment looks right. Use `run_in_background: true`:
+
 ```bash
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
+python run.py \
   -c configs/train_config.gin \
   --enable_cameras \
   -o <OUTPUT_DIR>_preview \
-  -b <BASE_POLICY_PATH> \
+  -b ./assets/x_mobility.ckpt \
   --logger tensorboard \
   --video \
   --embodiment <EMBODIMENT> \
   --environment <SCENE_KEY> \
   --num_envs 1
 ```
-Tell the user the preview is running with the GUI open. Ask them to verify:
-1. The robot spawns in a valid location (not clipping through objects)
-2. The scene geometry and collisions look correct
-3. The robot can navigate without issues
 
-Once the user confirms the preview looks good, kill the preview process and proceed to full-scale training.
+Tell the user the preview is running with the GUI open. Ask them to verify:
+1. The robot spawns in a valid location (not clipping through objects).
+2. The scene geometry and collisions look correct.
+3. The robot can navigate without issues.
+
+Once the user confirms the preview, kill it and proceed to full-scale training.
 
 ### Step 2: Full-scale training
-After user confirms the preview, launch the full training run with `run_in_background: true`:
+
+After preview confirmation, launch the full run with `run_in_background: true`:
+
 ```bash
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
+python run.py \
   -c configs/train_config.gin \
   --enable_cameras \
   -o <OUTPUT_DIR> \
-  -b <BASE_POLICY_PATH> \
+  -b ./assets/x_mobility.ckpt \
   -n <WANDB_PROJECT> \
   -r <RUN_NAME> \
   --logger tensorboard \
@@ -288,11 +290,12 @@ conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
   --num_envs <NUM_ENVS>
 ```
 
-Remove `--headless` if the user wants GUI mode. For GUI mode with SAGE-10k scenes (many meshes), use `--num_envs 1` to avoid OOM.
+Drop `--headless` if the user wants GUI mode. For GUI mode with SAGE-10k scenes (many meshes), use `--num_envs 1` to avoid GPU OOM.
 
 ### OSMO cluster submission
 
 The Python launcher in [osmo/run_osmo.py](../../../osmo/run_osmo.py) handles build+push+submit and is the recommended entry point:
+
 ```bash
 export WANDB_API_KEY=<key>
 export HF_TOKEN=<token>
@@ -300,11 +303,10 @@ export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
 
 python osmo/run_osmo.py train \
     --experiment-name <name> \
-    --wandb-project <project> \
-    --base-policy-ckpt <wandb-artifact>
+    --wandb-project <project>
 ```
 
-For direct `osmo workflow submit` invocation (advanced), see the [OSMO cloud submission](https://nvlabs.github.io/COMPASS/docs/osmo.html) handbook page. Workflow YAMLs live in [osmo/workflows/](../../../osmo/workflows/).
+The X-Mobility base checkpoint is now downloaded inside the workflow from `huggingface.co/nvidia/X-Mobility`, so no `--base-policy-ckpt` flag is needed. For direct `osmo workflow submit` invocation, see the [OSMO cloud submission](https://nvlabs.github.io/COMPASS/docs/osmo.html) handbook page. Workflow YAMLs live in [osmo/workflows/](../../../osmo/workflows/).
 
 ### Defaults
 | Parameter | Default | Source |
@@ -333,11 +335,11 @@ For direct `osmo workflow submit` invocation (advanced), see the [OSMO cloud sub
 ```bash
 CKPT=$(ls <TRAIN_OUTPUT_DIR>/model_*.pt | sort -V | tail -n 1)
 
-conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
+python run.py \
   -c configs/eval_config.gin \
   --enable_cameras \
   -o <OUTPUT_DIR> \
-  -b <BASE_POLICY_PATH> \
+  -b ./assets/x_mobility.ckpt \
   -p $CKPT \
   -n <WANDB_PROJECT> \
   -r eval_<RUN_NAME> \
@@ -355,7 +357,7 @@ conda run -n <ENV_NAME> ${ISAACLAB_PATH}/isaaclab.sh -p run.py \
 
 To inspect a USD scene before training (check collision meshes, layout, etc.):
 ```bash
-conda run -n <ENV_NAME> python -c "
+python -c "
 from isaacsim import SimulationApp
 app = SimulationApp({'headless': False, 'width': 1280, 'height': 720})
 import omni
@@ -365,15 +367,15 @@ while app.is_running():
 app.close()
 " &
 ```
-Use `dangerouslyDisableSandbox: true`. Enable collision visualization: **Show > Physics > Colliders**.
+Use `dangerouslyDisableSandbox: true`. Suggest the user enable **Show > Physics > Colliders** to verify collision meshes.
 
 ---
 
-## Setup SAGE (Local — Advanced)
+## Setup SAGE (local — advanced)
 
-Only needed for fully custom scene generation. SAGE has heavy deps (pytorch3d, TRELLIS, VLM servers) and requires a multi-GPU machine. SAGE-10k search is strongly preferred.
+Most users do **not** need this. SAGE-10k search (above) covers the typical case without any SAGE install. Only use a local SAGE install when the user explicitly wants to generate fully custom scenes (novel layouts not in SAGE-10k).
 
-See the SAGE repo README for full setup: https://github.com/NVlabs/sage
+For installation steps, dependencies, and trade-offs, see `references/setup-sage-local.md` — that file is loaded only when a local SAGE install is actually needed, to keep the main flow lean.
 
 ---
 
@@ -381,9 +383,13 @@ See the SAGE repo README for full setup: https://github.com/NVlabs/sage
 
 | File | Purpose |
 |------|---------|
-| `run.py` | Main entry point + `EnvSceneAssetCfgMap` (lines 118-128) |
+| `docker/run.sh` | Build / assets / up / down / exec / shell / status |
+| `docker/activate` | Sourceable activate script (sets up python/pip shims) |
+| `./assets/x_mobility.ckpt` | X-Mobility base policy (downloaded by `./docker/run.sh assets`) |
+| `./assets/usd/` | Built-in scene USDs (downloaded by `./docker/run.sh assets`) |
+| `run.py` | Main entry point + `EnvSceneAssetCfgMap` (around lines 118–128) |
 | `compass/rl_env/exts/mobility_es/mobility_es/config/environments.py` | Scene definitions, `USD_PATHS`, `EnvSceneAssetCfg` class |
-| `compass/rl_env/exts/mobility_es/mobility_es/usd/` | USD asset directories |
+| `compass/rl_env/exts/mobility_es/mobility_es/usd/` | User-added scene USDs (e.g., SAGE-10k conversions) |
 | `configs/train_config.gin` | Training parameters |
 | `configs/eval_config.gin` | Evaluation parameters |
 | `configs/shared.gin` | Shared config (embodiment, environment, steps) |

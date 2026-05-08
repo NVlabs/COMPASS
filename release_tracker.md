@@ -13,12 +13,13 @@
 |---|-----------|----------|--------|-------|
 | 1 | OSMO code migration (training runnable on OSMO) | P0 | ⬜ | TBD |
 | 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | ⬜ | @samc + @liuw |
-| 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | ⬜ | TBD |
+| 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | 🟡 | @liuw |
 | 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
 | 7 | Docker-as-venv dev environment (`docker/run.sh` + `docker/activate`) | P1 | 🟡 | @liuw |
 | 8 | Pre-release leak audit + sanitization | P0 | 🟡 | @liuw |
 | 9 | CI/CD setup + dependency pinning | P1 | 🟡 | @liuw |
+| 10 | Agentic skills refresh + new onboarding skills | P1 | 🟡 | @liuw |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
 
@@ -32,6 +33,7 @@ OSMO (#1) ───────────────────────�
 Agentic skills (#4) ────────────────────────────────────────────────────────┼──► Benchmark ──► Release
 Auto-OMap (#5) ─────────────────────────────────────────────────────────────┘
 Docs (#6), Dev environment (#7) — parallel; finalized before tag
+Agentic skills refresh (#10) ── depends on Dev environment (#7) and Sanitization (#8)
 PR-FOLLOWUP (multi-cam recorder + video upload + debug images) — post-release, outside critical path
 ```
 
@@ -114,18 +116,18 @@ Rationale: C + F record videos to disk; without D's wandb upload plumbing they'r
 
 ## 4. Agentic skills for automatic model training — P1
 
-Migrate the agentic-skills tooling that automates training-loop execution from the internal repo. **This already enables SAGE training** — no separate SAGE workstream is needed; the skills cover it. (Scope to be sharpened — do these run as Claude Code skills, as a CLI orchestrator, or as OSMO-side jobs?)
+Land the Claude Code skill that automates training-loop execution. Migration phase done — `.claude/skills/compass/SKILL.md` plus the two helper scripts (`scripts/sage10k_search.py`, `scripts/sage10k_to_usd.py`) are in the public repo and document the SAGE-10k → USD → register → train pipeline.
 
-- [ ] Identify scope: skill manifests vs. orchestrator code vs. both
-- [ ] Decide landing directory (`.claude/skills/`? `agentic/`?)
-- [ ] Sanitize for public release
-- [ ] Hook into training entry points (`run.py`, `distillation_train.py`)
-- [ ] Document trigger commands and expected behavior
-- [ ] Demo: end-to-end automated specialist training using one skill
-- [ ] Demo: SAGE-driven training using the migrated skills
+- [x] Identify scope: Claude Code skill (markdown + YAML frontmatter + helper scripts).
+- [x] Decide landing directory: `.claude/skills/compass/`.
+- [x] Sanitize for public release.
+- [x] Hook into training entry points (`run.py`, evaluation, OSMO submission).
+- [x] Document trigger commands and expected behavior (`docs/handbook/agentic.md`).
+- [ ] Demo: end-to-end automated specialist training using one skill — covered by **#10** verification.
+- [ ] Demo: SAGE-driven training using the skill — covered by **#10** verification.
 - [ ] PR: <link>
 
-**Internal source:** `gitlab-master.nvidia.com/ml_nav/compass` — agentic-skills directory TBD
+**Continued in:** #10 (refresh for docker-as-venv + new specialty skills). The two demo boxes flip 🟢 once #10's verification step runs them.
 
 ## 5. Auto OMap generation from USDs — P1
 
@@ -214,6 +216,23 @@ Bring the public repo up to a "first-line" CI posture before tagging:
 - [ ] PR: <link>
 
 **Branch:** `liuw/ci_setup` (off `liuw/sanitize_for_public`, latest in the stack).
+
+## 10. Agentic skills refresh + new onboarding skills — P1
+
+Refresh the existing `compass` skill for the new docker-as-venv flow (#7) and add three onboarding-focused specialty skills following the **hybrid front-door** pattern (`compass` is the umbrella; `compass-deploy` / `compass-debug` / `compass-newembodiment` are narrow siblings the auto-router picks unambiguously).
+
+- [x] Update `.claude/skills/compass/SKILL.md` for docker-as-venv (drop conda wrappers; new prereq check; new setup recipe; OSMO example aligned with #8). Add "Specialty skills" front-door section. Soften MUST-style rules with explanatory why.
+- [x] Pre-emptive progressive-disclosure split: extract "Setup SAGE Local (Advanced)" to `.claude/skills/compass/references/setup-sage-local.md`.
+- [x] Add `.claude/skills/compass-deploy/SKILL.md` (ckpt → ONNX → TRT → ROS2 launch scaffold).
+- [x] Add `.claude/skills/compass-debug/SKILL.md` + bundled `scripts/compass_status.sh` (8 diagnostic checks; markdown table; --deep + --ckpt flags).
+- [x] Add `.claude/skills/compass-newembodiment/SKILL.md` (interactive robot onboarding; parses pre-supplied user input; AskUserQuestion only for missing fields; diff-then-confirm before writing).
+- [x] Update `docs/handbook/agentic.md` with four-skill index ("Pick the right skill" matrix at the top).
+- [ ] Live invocation test in a fresh Claude Code session for each skill; confirm prereq check passes inside an activated shell.
+- [ ] Run the two #4 demo flows (specialist training + SAGE-driven training) using `/compass`; flip #4 demo boxes 🟢 on success.
+- [ ] (Post-PR follow-up) Run `/skill-creator`'s description-optimization loop against all four skills; apply the highest-scoring descriptions on a held-out trigger eval split.
+- [ ] PR: <link>
+
+**Branch:** `liuw/skills_enhancement` (off `liuw/ci_setup`, latest in the stack).
 
 ## Pre-release gates
 
