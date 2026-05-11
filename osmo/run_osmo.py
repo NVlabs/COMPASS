@@ -101,6 +101,12 @@ def parse_args():
                        help="Skip the residual head (use base policy only).")
     train.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     train.add_argument("--environment", default="", help="Override the gin-config environment.")
+    train.add_argument("--num-gpus",
+                       type=int,
+                       default=8,
+                       help="Number of GPUs (= torchrun ranks). All counts use the same "
+                       "distributed workflow YAML; the trainer's distributed code paths are "
+                       "world_size-aware so num_gpus=1 also works as a single-rank run.")
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
@@ -181,10 +187,14 @@ def submit_workflow(yaml_path: Path, set_args: dict, dry_run: bool) -> None:
 
 
 def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
+    if args.num_gpus < 1:
+        sys.stderr.write(f"ERROR: --num-gpus must be >= 1 (got {args.num_gpus}).\n")
+        sys.exit(2)
     yaml_path = WORKFLOWS_DIR / SUBCOMMAND_CONFIG["train"][0]
     set_args = {
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
         "image": image,
+        "num_gpus": args.num_gpus,
         "wandb_api_key": wandb_key,
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,

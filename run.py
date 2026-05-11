@@ -85,6 +85,13 @@ parser.add_argument('--embodiment', type=str, help='Embodiment type')
 parser.add_argument('--environment', type=str, help='Environment type')
 parser.add_argument('--num_envs', type=int, help='Number of environments')
 
+# Multi-GPU training. Pair with `torchrun --nproc_per_node N run.py --distributed ...`;
+# AppLauncher consumes this to bind each rank to its own GPU.
+parser.add_argument('--distributed',
+                    action='store_true',
+                    default=False,
+                    help='Run training across multiple GPUs (one process per GPU via torchrun).')
+
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 
@@ -97,6 +104,7 @@ simulation_app = app_launcher.app
 
 import gin
 import torch
+import torch.distributed as dist
 import wandb
 
 from mobility_es.config import environments
@@ -111,6 +119,26 @@ from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
 from compass.distillation.distillation import ESDistillationPolicyWrapper
 from compass.residual_rl.residual_ppo_trainer import ResidualPPOTrainer
 from compass.utils.logger import Logger
+
+
+class _NoOpLogger:
+    """Discards everything. Used on non-rank-0 processes in multi-GPU runs so
+    only rank 0 produces TensorBoard / W&B / artifact writes."""
+
+    def log_dict(self, *args, **kwargs):
+        pass
+
+    def log_video(self, *args, **kwargs):
+        pass
+
+    def log_artifact(self, *args, **kwargs):
+        pass
+
+    def log_config(self, *args, **kwargs):
+        pass
+
+    def close(self):
+        pass
 
 # Map from the embedding type to the RL env config.
 EmbodimentEnvCfgMap = {
@@ -156,18 +184,51 @@ def run(run_mode,
         seed,
         enable_curriculum=False):
 
-    # Setup logger.
-    logger = Logger(log_dir=args_cli.output_dir,
-                    backend=args_cli.logger,
-                    experiment_name=args_cli.wandb_run_name,
-                    project_name=args_cli.wandb_project_name,
-                    entity=args_cli.wandb_entity_name)
+    # Multi-GPU distributed setup. With `--distributed`, AppLauncher (already invoked
+    # at module load) reads LOCAL_RANK / RANK / WORLD_SIZE from torchrun's env, sets
+    # physics/active GPU per rank, and limits CPU threads. We still need to call
+    # init_process_group ourselves before any cross-rank op (param broadcast in
+    # ResidualPPOTrainer.__init__, gradient all-reduce in PPO.update).
+    if args_cli.distributed:
+        local_rank = app_launcher.local_rank
+        global_rank = app_launcher.global_rank
+        # Pin PyTorch's current CUDA device to this rank's GPU BEFORE
+        # init_process_group / any object-collective. NCCL's object
+        # collectives (dist.all_gather_object in _save_episode_logs)
+        # serialize through tensors built on torch.cuda.current_device().
+        # Without this call current_device() defaults to 0 on every rank
+        # and object-collective traffic routes through GPU 0 instead of
+        # the rank's GPU. (Tensor all-reduces are unaffected because their
+        # tensors carry an explicit device.)
+        torch.cuda.set_device(local_rank)
+        if not dist.is_initialized():
+            dist.init_process_group(backend="nccl")
+        device = f"cuda:{local_rank}"
+        is_rank_zero = global_rank == 0
+    else:
+        local_rank = 0
+        global_rank = 0
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        is_rank_zero = True
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # Setup logger. Only rank 0 writes TensorBoard / W&B / artifacts; other ranks get
+    # a no-op logger that discards everything.
+    if is_rank_zero:
+        logger = Logger(log_dir=args_cli.output_dir,
+                        backend=args_cli.logger,
+                        experiment_name=args_cli.wandb_run_name,
+                        project_name=args_cli.wandb_project_name,
+                        entity=args_cli.wandb_entity_name)
+    else:
+        logger = _NoOpLogger()
 
-    # Setup base policy.
+    # Setup base policy. Pin DataParallel to the rank's GPU when distributed; let it
+    # span all visible GPUs in the single-process / single-GPU path (the legacy default).
     base_policy = XMobilityBasePolicy(args_cli.base_policy_path)
-    base_policy = torch.nn.DataParallel(base_policy)
+    if args_cli.distributed:
+        base_policy = torch.nn.DataParallel(base_policy, device_ids=[local_rank])
+    else:
+        base_policy = torch.nn.DataParallel(base_policy)
     base_policy.to(device)
     base_policy.eval()
 
@@ -175,7 +236,11 @@ def run(run_mode,
     if args_cli.distillation_policy_path is not None:
         distillation_policy = ESDistillationPolicyWrapper(args_cli.distillation_policy_path,
                                                           embodiment)
-        distillation_policy = torch.nn.DataParallel(distillation_policy)
+        if args_cli.distributed:
+            distillation_policy = torch.nn.DataParallel(distillation_policy,
+                                                        device_ids=[local_rank])
+        else:
+            distillation_policy = torch.nn.DataParallel(distillation_policy)
         distillation_policy.to(device)
         distillation_policy.eval()
     else:
@@ -211,18 +276,29 @@ def run(run_mode,
     env_cfg.viewer.env_index = 0
     env_cfg.viewer.eye = (-2.5, -0.5, 1.5)
 
-    # Setup seed
-    env_cfg.seed = seed
+    # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
+    # rollouts collected by each rank explore different states (matches Isaac Lab's
+    # rsl_rl reference pattern).
+    env_cfg.seed = seed + global_rank
+
+    # Pin PhysX + Isaac Sim's render device to this rank's GPU. Without this every
+    # rank's env_cfg.sim.device defaults to cuda:0 and all 8 sims pile onto a single
+    # GPU (caught with a Vulkan OOM during material loading on the first attempt).
+    if args_cli.distributed:
+        env_cfg.sim.device = device
 
     # Disable rewards, termination and curriculum for eval.
     if run_mode == 'eval' or run_mode == 'record':
         env_cfg.rewards = None
         env_cfg.terminations = None
         env_cfg.curriculum = None
-    env = RLESEnvWrapper(cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    # Only rank 0 records video — non-rank-0 ranks would compete for the same files
+    # under output_dir/videos/ and produce duplicates.
+    record_video = args_cli.video and is_rank_zero
+    env = RLESEnvWrapper(cfg=env_cfg, render_mode="rgb_array" if record_video else None)
 
     # Setup video if enabled.
-    if args_cli.video:
+    if record_video:
         video_kwargs = {
             "video_folder":
                 os.path.join(args_cli.output_dir, "videos"),

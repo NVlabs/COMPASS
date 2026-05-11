@@ -7,12 +7,14 @@
 **Release manager:** @liuw
 **Status legend:** ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked · ⚪ deferred
 
+**Integration branch:** `liuw/training_time_improve` — 12 commits ahead of `main` (`30612e4`, 2025-10-16). Nothing merged yet; per-workstream PRs not split out. Tip commit: `9f478af`.
+
 ## Summary
 
 | # | Workstream | Priority | Status | Owner |
 |---|-----------|----------|--------|-------|
-| 1 | OSMO code migration (training runnable on OSMO) | P0 | ⬜ | TBD |
-| 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | ⬜ | @samc + @liuw |
+| 1 | OSMO code migration (training runnable on OSMO) | P0 | 🟡 | @liuw |
+| 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | 🟡 | @samc + @liuw |
 | 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | 🟡 | @liuw |
 | 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
@@ -20,8 +22,30 @@
 | 8 | Pre-release leak audit + sanitization | P0 | 🟡 | @liuw |
 | 9 | CI/CD setup + dependency pinning | P1 | 🟡 | @liuw |
 | 10 | Agentic skills refresh + new onboarding skills | P1 | 🟡 | @liuw |
+| 11 | Multi-GPU PPO training + perf instrumentation | TBD | 🟡 | @liuw |
 | — | No-regression benchmark (gate) | P0 | ⬜ | TBD |
 | — | CHANGELOG + version bump + tag | P0 | ⬜ | @liuw |
+
+## Branch state (current snapshot)
+
+All 12 commits below sit on `liuw/training_time_improve` (oldest → newest); nothing has merged to `main`. The per-workstream branches in `git branch -vv` (`liuw/osmo_migration`, `liuw/agentic_skills_migration`, …, `liuw/skills_enhancement`) are stacking checkpoints, not separate trees.
+
+| Commit | Workstream | Note |
+|--------|-----------|------|
+| `22b25ef` | #2&3 PR-1 | Isaac Lab 3.0 API migration (Bucket A) |
+| `1253f2a` | #1 | OSMO workflows + `run_osmo.py` (initial port) |
+| `000c3be` | #4 | Migrate `compass` Claude Code skill from internal repo |
+| `b20fb67` | #5 | USD-derived OMap generator + loader fallback |
+| `725b79c` | #7 | Docker-as-venv (`docker/run.sh` + `docker/activate`) |
+| `f4d89b8` | #6 | Docs site (academic landing + Sphinx handbook) |
+| `d0275cc` | #8 | OSMO sanitization (HF asset sources) |
+| `3cc5eaf` | #9 | Pre-commit CI workflow + requirements pinning |
+| `e0b6f20` | #10 | `/compass` refresh + deploy/debug/newembodiment skills |
+| `d605901` | #1 | Thread `--embodiment` / `--environment` through OSMO train |
+| `424a96a` | gate | Add benchmark.py sanitization subtask under gate |
+| `9f478af` | #11 | Multi-GPU PPO training + perf instrumentation |
+
+**Still missing in code:** NuRec PR-2 (Buckets B+E+H from `samc/support_nurec_assets_isaaclab_3.0`), sanitized `benchmark.py` (only the tracker subtask exists), CHANGELOG `[2.0.0]` entry, version bump.
 
 ## Dependencies
 
@@ -45,15 +69,17 @@ PR-FOLLOWUP (multi-cam recorder + video upload + debug images) — post-release,
 
 Bring OSMO training-launch code from internal `gitlab-master.nvidia.com/ml_nav/compass` to public `NVlabs/COMPASS`. Existing public repo already references OSMO dataset names (`record.py:147` `--dataset-name`).
 
-- [ ] Inventory OSMO-specific files in internal repo (launch scripts, configs, manifests)
-- [ ] Sanitize for public release (strip internal paths, secrets, unsupported clusters)
-- [ ] Decide landing directory (`scripts/osmo/` or `osmo/`)
-- [ ] Port docs / README section explaining OSMO submission flow
+- [x] Inventory OSMO-specific files in internal repo (launch scripts, configs, manifests) — landed in `1253f2a`
+- [x] Sanitize for public release (strip internal paths, secrets, unsupported clusters) — `1253f2a` (initial) + `d0275cc` (HF asset sources, no internal defaults)
+- [x] Decide landing directory: `osmo/`
+- [x] Port docs / README section explaining OSMO submission flow — `osmo/README.md` + root README section
+- [x] Thread `--embodiment` / `--environment` through train workflow (so multi-embodiment sweeps don't require YAML hand-edits) — `d605901`
 - [ ] Smoke test: launch one specialist training run end-to-end on OSMO
 - [ ] Smoke test: launch one distillation run end-to-end on OSMO
 - [ ] PR: <link>
 
-**Internal source:** `gitlab-master.nvidia.com/ml_nav/compass` — OSMO directory TBD
+**Internal source:** `gitlab-master.nvidia.com/ml_nav/compass`
+**Commits on integration branch:** `1253f2a`, `d0275cc`, `d605901`
 
 ## 2 & 3. Isaac Lab 3.0+ upgrade **+** NuRec official support — P0
 
@@ -76,9 +102,10 @@ The source branch `origin/samc/support_nurec_assets_isaaclab_3.0` (5 commits, ~1
 
 Foundation. No new features; pure 2.1 → 3.0 compat. Off `main`.
 
-- [ ] Extract A-only hunks from commit `3e6dcd9`
+- [x] Extract A-only hunks from commit `3e6dcd9` — landed in `22b25ef` ("Migrate mobility_es extension to Isaac Lab 3.0 API")
+- [x] Update version pins: README badge + `compass/rl_env/README.md` install instructions bumped to `v3.0.0-beta1` — part of `22b25ef`
 - [ ] Survey Isaac Lab 2.1 → 3.0 release notes / migration guide; confirm branch covers them
-- [ ] Update version pins: README badges, `docs/handbook/extending.md` (bare-metal install section)
+- [ ] Update `docs/handbook/extending.md` bare-metal install pin
 - [ ] Update `docker/Dockerfile.distillation` base image if needed (`Dockerfile.rl` already on branch)
 - [ ] **Reviewer spot-check**: quaternion convention flip across all rows of `environments.py` (wxyz → xyzw) — confirm no Y-up vs Z-up assumption breaks
 - [ ] Re-validate USD assets load under 3.0 (`compass/rl_env/exts/mobility_es/mobility_es/usd/`)
@@ -233,6 +260,26 @@ Refresh the existing `compass` skill for the new docker-as-venv flow (#7) and ad
 - [ ] PR: <link>
 
 **Branch:** `liuw/skills_enhancement` (off `liuw/ci_setup`, latest in the stack).
+
+## 11. Multi-GPU PPO training + perf instrumentation — TBD priority
+
+8-GPU distributed residual-RL training (torchrun + manual all-reduce for gradients / KL / metrics), per-stage timing instrumentation, supporting OSMO 8-GPU workflow, and a perf-analysis report.
+
+Scope (commit `9f478af`):
+- `run.py`, `compass/residual_rl/ppo.py`, `compass/residual_rl/residual_ppo_trainer.py`: `--distributed`, `dist.init_process_group(nccl)`, per-rank device pinning, rank-0 gating on logger / ckpt / video / episode-log, weighted per-rank log aggregation, manual gradient all-reduce (AVG) BEFORE clip, KL all-reduce before LR adaptation, metric all-reduce, diagnostics dict for `ppo/learning_rate` / `kl_mean` / `entropy` / `action_std_mean`.
+- `osmo/workflows/rl_es_train_8gpu_workflow.yaml`: 8-GPU / 80-CPU / 800-GiB on ovx-l40; train via `torch.distributed.run --nproc_per_node=8 run.py --distributed --num_envs 32` (256 total envs); single-process eval.
+- `osmo/run_osmo.py`: `--num-gpus` flag (choices 2, 8) routes to matching workflow YAML.
+
+- [x] Multi-GPU code path landed (`9f478af`)
+- [x] OSMO 8-GPU workflow YAML
+- [ ] **Release-scope decision:** ship in 2.0 vs defer? (impacts CHANGELOG, benchmark matrix, validation surface)
+- [ ] Numerical-equivalence check vs single-GPU baseline (loss curve / success-rate parity within seed noise)
+- [ ] 8-GPU OSMO smoke run reaches first PPO iter and produces ckpts
+- [ ] 2-GPU path smoke (the other `--num-gpus` choice)
+- [ ] Document `--distributed` in handbook / OSMO docs
+- [ ] PR: <link>
+
+**Branch:** currently sits at the tip of `liuw/training_time_improve` (this commit is the branch name's eponym). Needs to be carved into its own PR or rolled into the release stack.
 
 ## Pre-release gates
 

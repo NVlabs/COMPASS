@@ -14,11 +14,14 @@
 # limitations under the License.
 
 import os
+import time
+from contextlib import contextmanager
 
 import numpy as np
 import h5py
 import gin
 import torch
+import torch.distributed as dist
 from tqdm import tqdm
 
 from compass.residual_rl.constants import INPUT_IMAGE_SIZE
@@ -42,9 +45,9 @@ class ResidualPPOTrainer:
                  num_steps_per_env=100,
                  ckpt_save_interval=50,
                  debug_viz=False):
-        # Prepare log directory.
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        # Prepare log directory. exist_ok=True avoids a TOCTOU race when several
+        # torchrun ranks check + create concurrently.
+        os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
         self.logger = logger
         # Init environment and base policy.
@@ -53,6 +56,12 @@ class ResidualPPOTrainer:
         for param in self.base_policy.parameters():
             param.requires_grad = False
         self.device = device
+        # Multi-rank state. WORLD_SIZE / RANK are set by torchrun; default to 1 / 0 in
+        # single-process runs. is_rank_zero gates writes (checkpoints, video upload,
+        # episode-log aggregation) so only rank 0 produces side-effects on disk.
+        self.world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        self.global_rank = int(os.environ.get("RANK", "0"))
+        self.is_rank_zero = self.global_rank == 0
 
         # Get policy and critic state dimensions.
         self.goal_heading_dim = 2
@@ -74,6 +83,11 @@ class ResidualPPOTrainer:
                                             actor_state_dim=self.policy_state_dim,
                                             action_dim=self.action_dim,
                                             critic_state_dim=self.critic_state_dim).to(self.device)
+        # Broadcast initial actor-critic params from rank 0 so all ranks start identical.
+        # Combined with PPO's gradient all-reduce, this keeps params synchronized across ranks.
+        if self.world_size > 1:
+            for p in actor_critic.parameters():
+                dist.broadcast(p.data, src=0)
 
         # Init storage and model
         self.num_steps_per_env = num_steps_per_env
@@ -90,6 +104,8 @@ class ResidualPPOTrainer:
         self.debug_viz = debug_viz
 
         self.env.reset()
+
+        self._install_env_timers()
 
         print(self)
 
@@ -139,6 +155,90 @@ class ResidualPPOTrainer:
             self.critic_state_assembler.compute_critic_state(policy_state, obs_dict, extras)
         ]
 
+    def _install_env_timers(self):
+        # Monkey-patch a handful of Isaac Lab manager methods + sim.step / sim.render
+        # so each call adds its wall-clock time into self._env_breakdown. The trainer
+        # reads (and clears) this dict around every env.step() call to surface a
+        # per-stage breakdown of where env_step time goes.
+        # ~3% wall-clock overhead from extra cuda.synchronize() calls.
+        self._env_breakdown = {}
+        cuda_active = self.device != 'cpu' and torch.cuda.is_available()
+        env = self.env.unwrapped
+        targets = [
+            ("action_pre", getattr(env, "action_manager", None), "process_action"),
+            ("termination", getattr(env, "termination_manager", None), "compute"),
+            ("reward", getattr(env, "reward_manager", None), "compute"),
+            ("command", getattr(env, "command_manager", None), "compute"),
+            ("event", getattr(env, "event_manager", None), "apply"),
+            ("obs", getattr(env, "observation_manager", None), "compute"),
+            ("reset_idx", env, "_reset_idx"),
+            ("sim_step", env.sim, "step"),
+            ("sim_render", env.sim, "render"),
+        ]
+        breakdown = self._env_breakdown
+        for key, obj, method_name in targets:
+            if obj is None or not hasattr(obj, method_name):
+                continue
+            original = getattr(obj, method_name)
+
+            def _make_wrapper(orig, k):
+                def wrapper(*args, **kwargs):
+                    if cuda_active:
+                        torch.cuda.synchronize()
+                    t0 = time.perf_counter()
+                    try:
+                        return orig(*args, **kwargs)
+                    finally:
+                        if cuda_active:
+                            torch.cuda.synchronize()
+                        breakdown[k] = breakdown.get(k, 0.0) + (time.perf_counter() - t0)
+                return wrapper
+
+            setattr(obj, method_name, _make_wrapper(original, key))
+
+        # Drill one level deeper into observation_manager.compute by also wrapping
+        # each ObsTerm's func — surfaces which obs (camera_rgb_img, camera_depth_img,
+        # camera_to_world, route, ...) actually eats the time.
+        obs_mgr = getattr(env, "observation_manager", None)
+        if obs_mgr is not None:
+            for group_name, term_cfgs in obs_mgr._group_obs_term_cfgs.items():
+                term_names = obs_mgr._group_obs_term_names[group_name]
+                for name, cfg in zip(term_names, term_cfgs):
+                    if not callable(getattr(cfg, "func", None)):
+                        continue
+                    original = cfg.func
+                    key = f"obs_term/{group_name}/{name}"
+
+                    def _make_term_wrapper(orig, k):
+                        def wrapper(*args, **kwargs):
+                            if cuda_active:
+                                torch.cuda.synchronize()
+                            t0 = time.perf_counter()
+                            try:
+                                return orig(*args, **kwargs)
+                            finally:
+                                if cuda_active:
+                                    torch.cuda.synchronize()
+                                breakdown[k] = breakdown.get(k, 0.0) + (time.perf_counter() - t0)
+                        return wrapper
+
+                    cfg.func = _make_term_wrapper(original, key)
+
+    @contextmanager
+    def _timer(self, key, accumulator):
+        # CUDA ops are async; sync so the timer covers the actual GPU work.
+        # Cumulative add lets the same key be used across rollout sub-steps.
+        cuda_active = self.device != 'cpu' and torch.cuda.is_available()
+        if cuda_active:
+            torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            if cuda_active:
+                torch.cuda.synchronize()
+            accumulator[key] = accumulator.get(key, 0.0) + (time.perf_counter() - t0)
+
     def learn(self, num_learning_iterations):
         self.train_mode()
 
@@ -162,74 +262,95 @@ class ResidualPPOTrainer:
             print(10 * "_")
             print(f"Learning iteration {it}")
             print("Rollout:")
+            times = {"checkpoint": 0.0}
             with torch.inference_mode():
-                self.env.reset()
-                # Get obs ready for policy state and base action from base_policy
-                obs_dict = self.env.unwrapped.observation_manager.compute()
-                policy_state, base_actions, history, sample, extras = self.base_policy_process(
-                    obs_dict)
-                states = self.compute_states(policy_state, obs_dict, extras)
-
-                for _ in tqdm(range(self.num_steps_per_env)):
-                    # Get actions.
-                    residual_actions = self.alg.act(states)
-                    final_actions = base_actions + residual_actions
-
-                    # Run env step.
-                    obs_dict, rewards, dones, truncateds, infos = self.env.step(
-                        final_actions.float())
-
-                    # Move time out information to the extras dict
-                    # this is only needed for infinite horizon tasks
-                    if not self.env.unwrapped.cfg.is_finite_horizon:
-                        infos["time_outs"] = truncateds
-                    dones = torch.cat([
-                        dones.reshape(self.env.unwrapped.num_envs, 1),
-                        truncateds.reshape(self.env.unwrapped.num_envs, 1)
-                    ],
-                                      dim=1)
-                    dones = torch.any(dones, dim=1)
-
-                    # Process dones for ppo.
-                    self.alg.process_env_step(rewards, dones)
-
-                    # Process dones for base policy and policy state.
-                    history[dones] = 0
-                    sample[dones] = 0
-                    final_actions[dones] = 0
-
-                    if "log" in infos:
-                        ep_logs.append(infos["log"])
-
-                    # Visualize actions.
-                    if self.debug_viz:
-                        self.env.unwrapped.action_manager.get_term('drive_joints').visualize(
-                            base_actions, residual_actions)
-
-                    # Process obs for next step
+                with self._timer("env_reset_and_init", times):
+                    self.env.reset()
+                    # Get obs ready for policy state and base action from base_policy
+                    obs_dict = self.env.unwrapped.observation_manager.compute()
                     policy_state, base_actions, history, sample, extras = self.base_policy_process(
-                        obs_dict, history, sample, final_actions)
+                        obs_dict)
                     states = self.compute_states(policy_state, obs_dict, extras)
 
+                # The four rollout/* sub-step timers below sum to slightly less than
+                # rollout total; the gap is small bookkeeping ops (dones reshape/cat,
+                # history zeroing, viz) which we don't time individually.
+                with self._timer("rollout", times):
+                    for _ in tqdm(range(self.num_steps_per_env)):
+                        # Get actions.
+                        with self._timer("rollout/act", times):
+                            residual_actions = self.alg.act(states)
+                            final_actions = base_actions + residual_actions
+
+                        # Run env step.
+                        self._env_breakdown.clear()
+                        with self._timer("rollout/env_step", times):
+                            obs_dict, rewards, dones, truncateds, infos = self.env.step(
+                                final_actions.float())
+                        for _k, _v in self._env_breakdown.items():
+                            times[f"rollout/env_step/{_k}"] = times.get(
+                                f"rollout/env_step/{_k}", 0.0) + _v
+
+                        # Move time out information to the extras dict
+                        # this is only needed for infinite horizon tasks
+                        if not self.env.unwrapped.cfg.is_finite_horizon:
+                            infos["time_outs"] = truncateds
+                        dones = torch.cat([
+                            dones.reshape(self.env.unwrapped.num_envs, 1),
+                            truncateds.reshape(self.env.unwrapped.num_envs, 1)
+                        ],
+                                          dim=1)
+                        dones = torch.any(dones, dim=1)
+
+                        # Process dones for ppo.
+                        with self._timer("rollout/process_env_step", times):
+                            self.alg.process_env_step(rewards, dones)
+
+                        # Process dones for base policy and policy state.
+                        history[dones] = 0
+                        sample[dones] = 0
+                        final_actions[dones] = 0
+
+                        if "log" in infos:
+                            ep_logs.append(infos["log"])
+
+                        # Visualize actions.
+                        if self.debug_viz:
+                            self.env.unwrapped.action_manager.get_term('drive_joints').visualize(
+                                base_actions, residual_actions)
+
+                        # Process obs for next step
+                        with self._timer("rollout/base_policy_process", times):
+                            policy_state, base_actions, history, sample, extras = self.base_policy_process(
+                                obs_dict, history, sample, final_actions)
+                            states = self.compute_states(policy_state, obs_dict, extras)
+
                 # Learning step
-                self.alg.compute_returns(states)
+                with self._timer("compute_returns", times):
+                    self.alg.compute_returns(states)
 
             print("Update")
-            mean_value_loss, mean_surrogate_loss = self.alg.update()
+            with self._timer("update", times):
+                mean_value_loss, mean_surrogate_loss, ppo_diagnostics = self.alg.update()
             self.logger.log_dict(
                 {
                     "Mean_value_loss": mean_value_loss,
                     "Mean_surrogate_loss": mean_surrogate_loss,
+                    **ppo_diagnostics,
                 },
                 step=it)
 
-            self._save_episode_logs(ep_logs, it)
-            self._upload_video(it)
-            ep_logs.clear()
+            with self._timer("logging", times):
+                self._save_episode_logs(ep_logs, it)
+                self._upload_video(it)
+                ep_logs.clear()
 
             # Save checkpoint.
             if it % self.ckpt_save_interval == 0:
-                self._save_ckpt(os.path.join(self.output_dir, f"model_{it}.pt"))
+                with self._timer("checkpoint", times):
+                    self._save_ckpt(os.path.join(self.output_dir, f"model_{it}.pt"))
+
+            self.logger.log_dict({f"time/{k}": v for k, v in times.items()}, step=it)
 
         self.current_learning_iteration += num_learning_iterations
         self._save_ckpt(os.path.join(self.output_dir,
@@ -358,21 +479,54 @@ class ResidualPPOTrainer:
         data_to_record['goal_heading'].append(obs_dict["policy"]['goal_heading'])
 
     def _save_episode_logs(self, ep_logs, iteration):
-        for key in ep_logs[0]:
-            info_tensor = torch.tensor([], device=self.device)
-            ep_info = ep_logs[-1]
-            # handle scalar and zero dimensional tensor infos
-            if key not in ep_info:
-                continue
-            if not isinstance(ep_info[key], torch.Tensor):
-                ep_info[key] = torch.Tensor([ep_info[key]])
-            if len(ep_info[key].shape) == 0:
-                ep_info[key] = ep_info[key].unsqueeze(0)
-            info_tensor = torch.cat((info_tensor, ep_info[key].to(self.device)))
-            value = torch.mean(info_tensor)
-            self.logger.log_dict({key: value}, step=iteration)
+        # Each rank contributes the latest episode-log dict from its rollout
+        # (or None if no episodes terminated this iter). Rank 0 then computes
+        # a per-key element-weighted mean across all ranks: total elements
+        # summed / total elements counted. This is a true cross-rank
+        # aggregation, weighted by the number of envs that contributed on
+        # each rank (no equal-weight-per-rank skew, no dropped logs when
+        # some ranks happen to have empty ep_logs).
+        # all_gather_object is structurally symmetric (every rank sends one
+        # object, every rank gets the full list back) so it can't deadlock
+        # on rank-asymmetric data shapes the way per-key all_reduce can.
+        # Move tensor values to CPU before the gather so we don't round-trip
+        # cuda tensors through pickle and so the rank-0 aggregation is pure
+        # CPU work.
+        local = None
+        if ep_logs:
+            local = {k: (v.detach().cpu() if isinstance(v, torch.Tensor) else v)
+                     for k, v in ep_logs[-1].items()}
+        if self.world_size > 1:
+            gathered = [None] * self.world_size
+            dist.all_gather_object(gathered, local)
+        else:
+            gathered = [local]
+        if not self.is_rank_zero:
+            return
+        keys = set()
+        for d in gathered:
+            if d is not None:
+                keys.update(d.keys())
+        for key in sorted(keys):
+            total = 0.0
+            count = 0
+            for d in gathered:
+                if d is None or key not in d:
+                    continue
+                v = d[key]
+                if not isinstance(v, torch.Tensor):
+                    v = torch.Tensor([v])
+                if v.ndim == 0:
+                    v = v.unsqueeze(0)
+                v = v.float()
+                total += float(v.sum().item())
+                count += int(v.numel())
+            if count > 0:
+                self.logger.log_dict({key: total / count}, step=iteration)
 
     def _save_ckpt(self, path, infos=None):
+        if not self.is_rank_zero:
+            return
         saved_dict = {
             "model_state_dict": self.alg.actor_critic.state_dict(),
             "optimizer_state_dict": self.alg.optimizer.state_dict(),
@@ -383,6 +537,8 @@ class ResidualPPOTrainer:
         self.logger.log_artifact(path, "rl_es_checkpoints", "model")
 
     def _upload_video(self, iteration):
+        if not self.is_rank_zero:
+            return
         # Video generation can be slower than this function call, so add one iteration
         # delay for video upload.
         target_iteration = iteration - 1
@@ -397,7 +553,11 @@ class ResidualPPOTrainer:
                                   step=target_iteration)
 
     def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path, weights_only=False)
+        # map_location pins both model and optimizer tensors directly onto this
+        # rank's device. Without it every rank deserializes onto the original
+        # save device (cuda:0 from rank-0's checkpoint) before copying, which
+        # spikes GPU 0's memory by N x model size on resume.
+        loaded_dict = torch.load(path, weights_only=False, map_location=self.device)
         self.alg.actor_critic.load_state_dict(loaded_dict["model_state_dict"])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])

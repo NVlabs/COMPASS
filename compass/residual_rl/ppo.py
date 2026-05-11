@@ -13,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import gin
 import torch
 from torch import nn, optim
+import torch.distributed as dist
 
 from compass.residual_rl.rollout_storage import RolloutStorage
 
@@ -41,6 +44,7 @@ class PPO:
                  max_grad_norm=1.0):
 
         self.device = device
+        self.world_size = int(os.environ.get("WORLD_SIZE", "1"))
 
         # PPO components
         self.actor_critic = actor_critic
@@ -113,6 +117,8 @@ class PPO:
     def update(self):
         mean_value_loss = 0
         mean_surrogate_loss = 0
+        mean_entropy = 0
+        last_kl_mean = 0.0
         generator = self.storage.mini_batch_generator(self.num_mini_batches,
                                                       self.num_learning_epochs)
         for states_batch, actions_batch, target_values_batch, advantages_batch, \
@@ -136,11 +142,18 @@ class PPO:
                         (2.0 * torch.square(sigma_batch)) - 0.5,
                         axis=-1)
                     kl_mean = torch.mean(kl)
+                    # Synchronize KL across ranks so every rank reaches the same LR
+                    # adaptation decision. Without this, ranks would step the
+                    # optimizer with different LRs on identical (averaged) gradients
+                    # and parameters would diverge across ranks.
+                    if self.world_size > 1:
+                        dist.all_reduce(kl_mean, op=dist.ReduceOp.AVG)
+                    last_kl_mean = float(kl_mean.item())
 
                     if kl_mean > self.desired_kl * 2.0:
                         self.learning_rate = max(1e-5, self.learning_rate / 1.5)
                     elif (self.desired_kl / 2.0) > kl_mean > 0.0:
-                        self.learning_rate = min(1e-2, self.learning_rate * 1.5)
+                        self.learning_rate = min(2e-3, self.learning_rate * 1.5)
 
                     for param_group in self.optimizer.param_groups:
                         param_group['lr'] = self.learning_rate
@@ -166,21 +179,48 @@ class PPO:
             loss = surrogate_loss + self.value_loss_coef * value_loss - \
                 self.entropy_coef * entropy_batch.mean()
 
-            # Gradient step
+            # Gradient step. Canonical DDP order: backward → all-reduce → clip →
+            # step. The averaged gradient is what the optimizer applies, so clip
+            # the averaged gradient (not the per-rank one) — otherwise per-rank
+            # clipping followed by averaging across disagreeing ranks shrinks
+            # the gradient by ~1/sqrt(world_size) on top of the bound, which
+            # with PPO's value-loss-dominated norm crushes the actor signal.
             self.optimizer.zero_grad()
             loss.backward()
+            if self.world_size > 1:
+                for p in self.actor_critic.parameters():
+                    if p.grad is not None:
+                        dist.all_reduce(p.grad, op=dist.ReduceOp.AVG)
             nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
             self.optimizer.step()
 
             mean_value_loss += value_loss.item()
             mean_surrogate_loss += surrogate_loss.item()
+            mean_entropy += float(entropy_batch.mean().item())
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        mean_entropy /= num_updates
+        # Average reported metrics across ranks so rank-0's logger reflects global means.
+        if self.world_size > 1:
+            t = torch.tensor([mean_value_loss, mean_surrogate_loss, mean_entropy],
+                             device=self.device)
+            dist.all_reduce(t, op=dist.ReduceOp.AVG)
+            mean_value_loss = t[0].item()
+            mean_surrogate_loss = t[1].item()
+            mean_entropy = t[2].item()
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss
+        # Diagnostics dict for the trainer to log. action std is a parameter
+        # (same on every rank by construction), so no all-reduce needed.
+        diagnostics = {
+            "ppo/learning_rate": self.learning_rate,
+            "ppo/kl_mean": last_kl_mean,
+            "ppo/entropy": mean_entropy,
+            "ppo/action_std_mean": float(self.actor_critic.std.detach().mean().item()),
+        }
+        return mean_value_loss, mean_surrogate_loss, diagnostics
 
     def _get_policy_states(self, states):
         return states[0]

@@ -12,14 +12,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# N-GPU distributed residual-RL training. Launches the train phase via
+# torch.distributed.run --nproc_per_node={{num_gpus}} so each rank owns its
+# own Isaac Sim instance pinned to a different GPU. Per-rank rollouts are
+# collected in parallel ({{num_gpus}} x num_envs total transitions per iter);
+# gradients are synced via manual all-reduce in PPO.update. The eval phase at
+# the end is left as a single-process invocation since eval doesn't benefit
+# from multi-GPU and the residual policy is small.
+#
+# cpu / memory are sized for an 8x L40 node and are NOT scaled per
+# num_gpus — running with num_gpus < 8 over-allocates harmlessly; running
+# with num_gpus > 8 would require bumping both knobs and picking a larger
+# platform.
 version: 2
 workflow:
   name: {{workflow_name}}
   resources:
     default:
-      cpu: 20
-      gpu: 2
-      memory: 200Gi
+      cpu: 80
+      gpu: {{num_gpus}}
+      memory: 800Gi
       platform: ovx-l40
       storage: 400Gi
   tasks:
@@ -71,8 +84,12 @@ workflow:
           RESUME_CKPT=$(ls ./resume_ckpt/model_*.pt | sort -V | tail -n 1)
         fi
 
-        # Launch training.
-        TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c configs/train_config.gin --enable_cameras -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video"
+        # Launch training across {{num_gpus}} GPUs via torchrun. Each rank
+        # spawns its own Isaac Sim instance + env; gradients sync via manual
+        # all-reduce in PPO.update. Total parallel envs = {{num_gpus}} *
+        # num_envs. We pin --num_envs 32 here because the gin default of 64
+        # OOMs on L40 (48 GB) at this batch size; 32 fits comfortably.
+        TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c configs/train_config.gin --enable_cameras -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --num_envs 32"
 
         EMBODIMENT={{embodiment}}
         if [[ -n $EMBODIMENT ]]; then
@@ -96,7 +113,9 @@ workflow:
         echo $TRAIN_CMD
         eval $TRAIN_CMD
 
-        # Launch evaluation of last checkpoint.
+        # Launch evaluation of last checkpoint. Eval is single-process — it
+        # uses one of the allocated GPUs and leaves the rest idle, which is
+        # fine for a one-shot eval at the end of training.
         eval_ckpt=$(ls $OUTPUT_DIR/model_*.pt | sort -V | tail -n 1)
         ckpt_name=$(basename "$eval_ckpt")
         EVAL_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c configs/eval_config.gin --enable_cameras -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --headless --video --video_interval 1"
@@ -126,7 +145,8 @@ workflow:
 
 default-values:
   image: ""
-  workflow_name: compass_rl_es
+  workflow_name: compass_rl_es_train
+  num_gpus: 8
   no_residual: ""
   resume_ckpt_artifact: ""
   embodiment: ""
