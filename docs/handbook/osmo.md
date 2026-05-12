@@ -42,6 +42,8 @@ submitting, add `--dry-run`.
 | `record` | [`osmo/workflows/rl_es_record_workflow.yaml`](https://github.com/NVlabs/COMPASS/blob/main/osmo/workflows/rl_es_record_workflow.yaml) | Roll out a specialist policy to collect HDF5 data for distillation |
 | `distill` | [`osmo/workflows/distillation_train_workflow.yaml`](https://github.com/NVlabs/COMPASS/blob/main/osmo/workflows/distillation_train_workflow.yaml) | Train the generalist distillation policy |
 
+A separate launcher [`osmo/run_benchmark.py`](https://github.com/NVlabs/COMPASS/blob/main/osmo/run_benchmark.py) reuses the eval workflow above to fire a no-regression benchmark sweep across scenes for a given embodiment — see [Benchmark](#benchmark) below.
+
 ### `train`
 
 ```bash
@@ -87,6 +89,23 @@ python osmo/run_osmo.py distill \
     [--train-config distillation_config] \
     [--image <pre-built-image>]
 ```
+
+## Benchmark
+
+Use [`osmo/run_benchmark.py`](https://github.com/NVlabs/COMPASS/blob/main/osmo/run_benchmark.py) to sweep a checkpoint across multiple scenes for one embodiment in a single invocation. Each `--environments` entry fires one `rl_es_eval_workflow.yaml` submission; results land in W&B under `bm_<embodiment>_<environment>_<experiment-name>` with the usual `eval/goal_reached_rate`, `eval/fall_down_rate`, `eval/total_travel_time`, and `eval/weighted_travel_time` metrics. Re-run with different `--embodiment` values for full matrix coverage.
+
+```bash
+python osmo/run_benchmark.py \
+    --experiment-name <name> \
+    --wandb-project-name <wandb-project> \
+    --checkpoint-artifact <residual-wandb-artifact> \
+    [--distillation-ckpt-artifact <wandb-artifact>] \
+    [--embodiment h1|spot|carter|g1|digit] \
+    [--environments simple_office warehouse_single_rack ...] \
+    [--image-name <pre-built-image>]
+```
+
+Default sweep covers `simple_office`, `warehouse_single_rack`, `warehouse_multi_rack`, `combined_single_rack`, `combined_multi_rack` with `--embodiment h1`. Prerequisites and `--registry-prefix` / `--image-name` / `--dry-run` / `--prompt` behavior are the same as `run_osmo.py`.
 
 ## Image build behavior
 

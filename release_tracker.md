@@ -226,7 +226,7 @@ planning round; the meaningful work is in the OSMO entry script.
 - [x] Update `docs/handbook/osmo.md` to reflect HF-sourced assets + required `--wandb-project`
 - [ ] `ros2_deployment/compass_navigator/setup.py`: review maintainer attribution (flag for @liuw; team alias preferred)
 - [ ] OSMO smoke test: resubmit `compass_rl_es_g1_official` with the rebuilt image; confirm HF download steps succeed and training reaches first PPO iter
-- [ ] Repo-wide grep gate: `grep -rnE "groot_mobility_rl_es_usds|nvidia-isaac/|afm_train" --include='*.py' --include='*.sh' --include='*.yaml' --include='*.gin' --include='*.html' .` returns no live-source hits
+- [ ] Repo-wide grep gate: `grep -rnE "groot_mobility_rl_es_usds|nvidia-isaac/|afm_train|groot_mobility_rl_enhance|afm_rl_enhance" --include='*.py' --include='*.sh' --include='*.yaml' --include='*.gin' --include='*.html' .` returns no live-source hits
 - [ ] Distill `release_tracker.md` + `dev_env_plan.md` into `CHANGELOG.md` and remove from the repo at tag time (existing gate row)
 - [ ] PR: <link>
 
@@ -284,7 +284,7 @@ Scope (commit `9f478af`):
 ## Pre-release gates
 
 - [ ] **No-regression benchmark** — run all supported embodiments × scenes on `main` post-merge, compare success rate / SPL / collision rate to 1.5.0 baselines, post results in this tracker
-  - [ ] Sanitize and land internal `benchmark.py` (113 lines; hardcodes `nvcr.io/nvstaging/isaac-amr/groot_mobility_rl_enhance` registry + `afm_rl_enhance` defaults). Mirror the #1 / #8 sanitization pattern: drop internal registry, drop wandb-project defaults, accept `--registry-prefix` like `osmo/run_osmo.py`. Suggested landing path: `osmo/run_benchmark.py` (next to `run_osmo.py`).
+  - [x] Sanitize and land internal `benchmark.py` (113 lines; hardcodes `nvcr.io/nvstaging/isaac-amr/groot_mobility_rl_enhance` registry + `afm_rl_enhance` defaults). Landed as `osmo/run_benchmark.py` on `liuw/benchmark_port`: Apache-2.0 header, `--registry-prefix` (with `$COMPASS_OSMO_REGISTRY` fallback), `--wandb-project-name` now `required=True`, workflow path resolved relative to `osmo/`. Reuses existing `osmo/workflows/rl_es_eval_workflow.yaml`.
   - [ ] Define the regression matrix: which embodiments × scenes × seeds, with what success/SPL/collision thresholds vs the v1.5.0 baseline.
   - [ ] Capture baseline numbers from v1.5.0 (or last known-good run) into this file before kicking off the new run.
 - [ ] All P0 items 🟢
