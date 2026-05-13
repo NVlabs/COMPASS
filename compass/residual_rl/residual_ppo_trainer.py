@@ -182,6 +182,7 @@ class ResidualPPOTrainer:
             original = getattr(obj, method_name)
 
             def _make_wrapper(orig, k):
+
                 def wrapper(*args, **kwargs):
                     if cuda_active:
                         torch.cuda.synchronize()
@@ -192,6 +193,7 @@ class ResidualPPOTrainer:
                         if cuda_active:
                             torch.cuda.synchronize()
                         breakdown[k] = breakdown.get(k, 0.0) + (time.perf_counter() - t0)
+
                 return wrapper
 
             setattr(obj, method_name, _make_wrapper(original, key))
@@ -201,6 +203,8 @@ class ResidualPPOTrainer:
         # camera_to_world, route, ...) actually eats the time.
         obs_mgr = getattr(env, "observation_manager", None)
         if obs_mgr is not None:
+            # pylint: disable=protected-access — we need access to the obs_manager's
+            # internal term tables to wrap each obs term's func for perf measurement.
             for group_name, term_cfgs in obs_mgr._group_obs_term_cfgs.items():
                 term_names = obs_mgr._group_obs_term_names[group_name]
                 for name, cfg in zip(term_names, term_cfgs):
@@ -210,6 +214,7 @@ class ResidualPPOTrainer:
                     key = f"obs_term/{group_name}/{name}"
 
                     def _make_term_wrapper(orig, k):
+
                         def wrapper(*args, **kwargs):
                             if cuda_active:
                                 torch.cuda.synchronize()
@@ -220,6 +225,7 @@ class ResidualPPOTrainer:
                                 if cuda_active:
                                     torch.cuda.synchronize()
                                 breakdown[k] = breakdown.get(k, 0.0) + (time.perf_counter() - t0)
+
                         return wrapper
 
                     cfg.func = _make_term_wrapper(original, key)
@@ -321,8 +327,9 @@ class ResidualPPOTrainer:
 
                         # Process obs for next step
                         with self._timer("rollout/base_policy_process", times):
-                            policy_state, base_actions, history, sample, extras = self.base_policy_process(
-                                obs_dict, history, sample, final_actions)
+                            (policy_state, base_actions, history, sample,
+                             extras) = self.base_policy_process(obs_dict, history, sample,
+                                                                final_actions)
                             states = self.compute_states(policy_state, obs_dict, extras)
 
                 # Learning step
@@ -494,8 +501,10 @@ class ResidualPPOTrainer:
         # CPU work.
         local = None
         if ep_logs:
-            local = {k: (v.detach().cpu() if isinstance(v, torch.Tensor) else v)
-                     for k, v in ep_logs[-1].items()}
+            local = {
+                k: (v.detach().cpu() if isinstance(v, torch.Tensor) else v)
+                for k, v in ep_logs[-1].items()
+            }
         if self.world_size > 1:
             gathered = [None] * self.world_size
             dist.all_gather_object(gathered, local)

@@ -280,9 +280,9 @@ def main():
             print(f"     Room types: {room_types}")
             print(f"     Style: {meta['building_style'] or 'N/A'}")
             print(f"     Objects: {meta['object_count']}")
-            print(f"     Description: {meta['description'][:100]}..."
-                  if len(meta.get('description', '')) > 100 else
-                  f"     Description: {meta['description'] or 'N/A'}")
+            print(f"     Description: {meta['description'][:100]}..." if len(
+                meta.get('description', '')) >
+                  100 else f"     Description: {meta['description'] or 'N/A'}")
             print(f"     File: {meta['zip_path']}")
             print()
 
