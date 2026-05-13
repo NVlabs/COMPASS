@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis">
+  <meta name="keywords" content="Cross-embodiment, Mobility Policy, Residual RL, Policy Distillation">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis</title>
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+  <link rel="icon" href="data:,">
+
+  <style>
+    .publication-title {
+      font-weight: normal;  /* Make base text normal weight */
+    }
+    .publication-title strong {
+      font-weight: 700;     /* Make bold text heavier */
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-2 publication-title">
+            <strong>COMPASS</strong>: <strong>C</strong>ross-emb<strong>O</strong>diment <strong>M</strong>obility <strong>P</strong>olicy<br>
+            via Residu<strong>A</strong>l RL and <strong>S</strong>kill <strong>S</strong>ynthesis
+          </h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              Wei Liu<sup>1</sup>,</span>
+            <span class="author-block">
+              Huihua Zhao<sup>1</sup>,</span>
+            <span class="author-block">
+              Chenran Li<sup>1,2</sup>,
+            </span>
+            <span class="author-block">
+              Yuchen Deng<sup>1</sup>,
+            </span>
+            <span class="author-block">
+              Joydeep Biswas<sup>1,3</sup>,
+            </span>
+            <span class="author-block">
+              Soha Pouya<sup>1</sup>,
+            </span>
+            <span class="author-block">
+              Yan Chang<sup>1</sup>
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>NVIDIA,</span>
+            <span class="author-block"><sup>2</sup>UC Berkeley</span>
+            <span class="author-block"><sup>3</sup>UT Austin</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2502.16372"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2502.16372"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/NVlabs/COMPASS"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                  </a>
+              </span>
+              <!-- Docs Link. -->
+              <span class="link-block">
+                <a href="./docs/"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-book"></i>
+                  </span>
+                  <span>Docs</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <video id="teaser" autoplay muted loop playsinline controls height="100%">
+        <source src="./static/videos/merged_grid.mp4"
+                type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            As robots are increasingly deployed in diverse application domains, enabling robust mobility across different embodiments has become a critical challenge. Classical mobility stacks, though effective on specific platforms, require extensive per-robot tuning and do not scale easily to new embodiments. Learning-based approaches, such as imitation learning (IL), offer alternatives, but face significant limitations on the need for high-quality demonstrations for each embodiment.
+          </p>
+          <p>
+            To address these challenges, we introduce COMPASS, a unified framework that enables scalable cross-embodiment mobility using expert demonstrations from only a single embodiment. We first pre-train a mobility policy on a single robot using IL, combining a world model with a policy model. We then apply residual reinforcement learning (RL) to efficiently adapt this policy to diverse embodiments through corrective refinements. Finally, we distill specialist policies into a single generalist policy conditioned on an embodiment embedding vector. This design significantly reduces the burden of collecting data while enabling robust generalization across a wide range of robot designs. Our experiments demonstrate that COMPASS scales effectively across diverse robot platforms while maintaining adaptability to various environment configurations, achieving a generalist policy with a success rate approximately 5X higher than the pre-trained IL policy, and further demonstrates zero-shot sim-to-real transfer.
+          </p>
+        </div>
+      </div>
+    </div>
+    <!--/ Abstract. -->
+  </div>
+</section>
+
+<section class="section">
+    <div class="container is-max-desktop">
+      <!-- Method -->
+      <div class="columns is-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Method</h2>
+
+          <!-- Method figure -->
+          <div class="content has-text-centered">
+            <div class="columns is-centered">
+              <div class="column is-full-width">
+                <img src="./static/images/method.png" alt="Method overview">
+              </div>
+            </div>
+          </div>
+
+          <!-- Method description -->
+          <div class="content has-text-justified">
+            <p>
+              COMPASS introduces a novel three-stage learning workflow for developing cross-embodiment mobility policies:
+            </p>
+            <ol>
+              <li><strong>Imitation Learning:</strong> We first train a foundational model that combines a world model with a mobility policy using easily accessible teacher policies.</li>
+              <li><strong>Residual RL:</strong> Building on the base policy, we employ residual reinforcement learning to fine-tune embodiment-specific policies, handling various physical constraints and sensor modalities.</li>
+              <li><strong>Policy Distillation:</strong> Finally, we merge these embodiment-specialist policies into a single robust cross-embodiment policy through policy distillation.</li>
+            </ol>
+            <p>
+              This approach enables efficient transfer of mobility skills across diverse robot platforms while maintaining adaptability to various environment configurations.
+            </p>
+          </div>
+        </div>
+      </div>
+      <!--/ Method -->
+    </div>
+  </section>
+
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Cross-embodiment Introduction -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Results</h2>
+        <div class="content has-text-justified">
+          <p>
+            Extensive experiments demonstrate that COMPASS can achieve robust generalization across diverse robot platforms while preserving the adaptability needed to succeed in varied environments. Quantitatively, the RL specialists and the distilled generalist policy can achieve a 5X higher success rate and 3X lower travel time on average than the pre-trained IL policy (X-Mobility).
+          </p>
+        </div>
+        <!-- Benchmark figure -->
+        <div class="content has-text-centered">
+            <div class="columns is-centered">
+                <div class="column is-full-width">
+                <img src="./static/images/benchmark.png" alt="Benchmark Results">
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Sim2Real Transfer -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Zero-shot Sim2Real Transfer</h2>
+        <div class="content has-text-justified">
+          <p>
+            COMPASS policies trained in simulation can be directly deployed on real robots, demonstrating strong sim2real transfer capabilities without additional fine-tuning.
+          </p>
+        </div>
+        <div class="content">
+          <div class="mb-5">
+            <div class="content has-text-centered">
+              <!-- This is a real-world deployment video. -->
+              <video autoplay muted loop playsinline controls width="100%">
+                <source src="./static/videos/compass_sim2real_improve_full.mp4" type="video/mp4">
+              </video>
+              <p class="caption">Real-world deployment of COMPASS policy on real robots: Carter and G1.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Open Vocabulary Object Navigation</h2>
+    <div class="content has-text-justified">
+      <p>
+        Open Vocabulary Object Navigation by integrating <a href="https://locate3d.atmeta.com/" target="_blank">Locate3D</a> with COMPASS.
+      </p>
+      <div class="content has-text-centered">
+        <video autoplay muted loop playsinline controls width="80%">
+          <source src="./static/videos/locate3d_compass_w_side.mp4" type="video/mp4">
+        </video>
+        <p class="caption">COMPASS policy performing open vocabulary object navigation by integrating Locate3D.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">GR00T Post-training with COMPASS Datasets</h2>
+    <div class="content has-text-justified">
+      <p>
+        <a href="https://github.com/NVIDIA/Isaac-GR00T" target="_blank">GR00T</a> Post-training with COMPASS distillation datasets, enabling navigation capabilities.
+      </p>
+      <div class="content has-text-centered">
+        <video autoplay muted loop playsinline controls width="80%">
+          <source src="./static/videos/corl_groot_fine_tune.mp4" type="video/mp4">
+        </video>
+        <p class="caption">GR00T post-training with COMPASS datasets for navigation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>
+    @article{liu2025compass,
+      title={COMPASS: Cross-embodiment Mobility Policy via Residual RL and Skill Synthesis},
+      author={Liu, Wei and Zhao, Huihua and Li, Chenran and Deng, Yuchen and Biswas, Joydeep and Pouya, Soha and Chang, Yan},
+      journal={arXiv preprint arXiv:2502.16372},
+      year={2025}
+    }
+    </code></pre>
+  </div>
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // List of video IDs to limit and their durations
+    const videoLimits = {
+      'h1-video': 10,
+      'spot-video': 8,
+      'carter-video': 5,
+      'g1-video': 10
+    };
+
+    // Apply limits only to specified videos
+    Object.entries(videoLimits).forEach(([videoId, maxDuration]) => {
+      const video = document.getElementById(videoId);
+      if (video) {
+        video.addEventListener('timeupdate', function() {
+          if (this.currentTime >= maxDuration) {
+            this.currentTime = 0; // Reset to beginning
+          }
+        });
+      }
+    });
+  });
+</script>
+
+<footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+                Page template borrowed from <a
+                href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

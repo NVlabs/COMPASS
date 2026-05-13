@@ -16,10 +16,11 @@
 from __future__ import annotations
 
 import torch
+import warp as wp
 from collections.abc import Sequence
 
 from isaaclab.assets.articulation import Articulation
-from isaaclab.envs.mdp.actions import ActionTerm, ActionTermCfg
+from isaaclab.managers import ActionTerm, ActionTermCfg
 
 from mobility_es.mdp.action.action_visualization import ActionVisualizer
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper
@@ -61,19 +62,16 @@ class NonHolonomicPerfectControlAction(ActionTerm):
         self._processed_actions = self.raw_actions[:, (0, 5)]
 
     def apply_actions(self):
-        # Get current asset state
-        root_state = self._asset.data.root_state_w
-
         # Extract linear_x and angular_z from actions
         linear_x = self.processed_actions[:, 0]
         angular_z = self.processed_actions[:, 1]
 
-        # Get current position and orientation quaternion
-        pos = root_state[:, :3]
-        quat = root_state[:, 3:7]
+        # Get current position and orientation quaternion (xyzw: x=0, y=1, z=2, w=3)
+        pos = wp.to_torch(self._asset.data.root_link_pos_w).clone()
+        quat = wp.to_torch(self._asset.data.root_link_quat_w)
 
-        # Convert quaternion to yaw angle
-        yaw = 2 * torch.atan2(quat[:, 3], quat[:, 0])
+        # Convert quaternion to yaw angle (xyzw convention: x=0, y=1, z=2, w=3)
+        yaw = 2 * torch.atan2(quat[:, 2], quat[:, 3])
 
         # Update yaw with angular velocity
         dt = self._env.physics_dt
@@ -83,23 +81,24 @@ class NonHolonomicPerfectControlAction(ActionTerm):
         pos[:, 0] += linear_x * torch.cos(new_yaw) * dt
         pos[:, 1] += linear_x * torch.sin(new_yaw) * dt
 
-        # Convert new yaw to quaternion (rotation around z-axis only)
+        # Convert new yaw to quaternion (rotation around z-axis only, xyzw convention)
         new_quat = torch.zeros_like(quat)
-        new_quat[:, 0] = torch.cos(new_yaw / 2)
-        new_quat[:, 3] = torch.sin(new_yaw / 2)
+        new_quat[:, 2] = torch.sin(new_yaw / 2)    # z component
+        new_quat[:, 3] = torch.cos(new_yaw / 2)    # w component
 
-        # Update root state
-        root_state[:, :3] = pos
-        root_state[:, 3:7] = new_quat
-        root_state[:, 7:10] = torch.stack([
-            linear_x * torch.cos(new_yaw), linear_x * torch.sin(new_yaw),
-            torch.zeros_like(linear_x)
+        # Write new pose and velocity separately (root_state_w API removed in IsaacLab 3.0)
+        new_pose = torch.cat([pos, new_quat], dim=-1)
+        new_vel = torch.stack([
+            linear_x * torch.cos(new_yaw),
+            linear_x * torch.sin(new_yaw),
+            torch.zeros_like(linear_x),
+            torch.zeros_like(angular_z),
+            torch.zeros_like(angular_z),
+            angular_z,
         ],
-                                          dim=1)
-        root_state[:, 10:13] = torch.stack(
-            [torch.zeros_like(angular_z),
-             torch.zeros_like(angular_z), angular_z], dim=1)
-        self._asset.write_root_state_to_sim(root_state)
+                              dim=1)
+        self._asset.write_root_pose_to_sim_index(root_pose=new_pose)
+        self._asset.write_root_velocity_to_sim_index(root_velocity=new_vel)
 
     def reset(self, env_ids: Sequence[int] | None = None) -> None:
         self._raw_actions[env_ids] = 0.0

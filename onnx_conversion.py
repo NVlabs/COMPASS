@@ -163,7 +163,9 @@ def convert(base_checkpoint_path: str,
     # Output names.
     output_names = ['action_output', 'history_output', 'sample_output']
 
-    # ONNX conversion.
+    # ONNX conversion. Pin dynamo=False to use the legacy exporter — the
+    # torch>=2.6 dynamo exporter trips on FakeTensor .data_ptr() access in
+    # X-Mobility's custom kernels.
     torch.onnx.export(model, (image, route, goal_heading, speed, action, history, sample),
                       onnx_path,
                       verbose=True,
@@ -171,7 +173,8 @@ def convert(base_checkpoint_path: str,
                           'image', 'route', 'goal_heading', 'speed', 'action_input',
                           'history_input', 'sample_input'
                       ],
-                      output_names=output_names)
+                      output_names=output_names,
+                      dynamo=False)
 
 
 def main():

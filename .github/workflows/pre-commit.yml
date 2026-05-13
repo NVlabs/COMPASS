@@ -1,0 +1,31 @@
+# Run the repo's pre-commit hooks on every PR + push to main.
+# Hooks are pinned in .pre-commit-config.yaml (yapf, pylint, nbstripout,
+# clang-format, requirements-txt-fixer, trailing-whitespace, end-of-file-fixer,
+# check-added-large-files). pylint runs without project deps because
+# `.pylintrc` disables `import-error`.
+
+name: pre-commit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install clang-format binary
+        # mirrors-clang-format @ v13.0.0 expects clang-format on PATH; install
+        # via apt for reproducibility (slightly faster on cold cache than the
+        # hook's own download).
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - uses: pre-commit/action@v3.0.1

@@ -40,7 +40,7 @@ carter = ArticulationCfg(
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.02),
-        rot=(1, 0.0, 0.0, 0),
+        rot=(0.0, 0.0, 0.0, 1),
         joint_pos={
             "joint_wheel_left": 0.0,
             "joint_wheel_right": 0.0,
@@ -62,7 +62,7 @@ carter = ArticulationCfg(
                     "joint_caster_left",
                     "joint_caster_right",
                 ],
-                velocity_limit=1000,
+                velocity_limit_sim=360.0,
                 stiffness=0.0,
                 damping=0.0,
             ),

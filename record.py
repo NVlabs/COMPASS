@@ -132,7 +132,7 @@ def main():
     parser.add_argument('--wandb-project-name',
                         '-n',
                         type=str,
-                        default='afm_rl_enhance_record',
+                        default='compass',
                         help='The project name of W&B.')
     parser.add_argument('--wandb-entity-name',
                         '-e',

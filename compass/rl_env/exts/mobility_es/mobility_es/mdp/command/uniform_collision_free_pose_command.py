@@ -18,6 +18,7 @@ from __future__ import annotations
 import random
 
 import torch
+import warp as wp
 from typing import TYPE_CHECKING
 from collections.abc import Sequence
 
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from mobility_es.mdp.command.commands_cfg import UniformCollisionFreePose2dCommandCfg
 
 
-class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dCommand):
+class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
     """Command generator that generates pose commands containing a 3-D position and heading.
 
     The command generator samples uniform 2D positions around the environment origin. It sets
@@ -73,7 +74,8 @@ class UniformCollisionFreePoseCommand(commands.pose_2d_command.UniformPose2dComm
         num_resample_trials = 0
         while num_resample_trials < self.cfg.max_resample_trial:
             # Obtain origins for the robots
-            self.pos_command_w[resample_env_ids] = self.robot.data.root_pos_w[resample_env_ids]
+            self.pos_command_w[resample_env_ids] = wp.to_torch(
+                self.robot.data.root_pos_w)[resample_env_ids]
             # Offset the position command by the current root position
             r = torch.empty(len(resample_env_ids), device=self.device)
             # Randomize the position

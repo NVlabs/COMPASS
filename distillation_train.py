@@ -19,12 +19,31 @@ from enum import Enum
 
 import gin
 import pytorch_lightning as pl
+import torch
 import wandb
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 
+from compass.distillation.distillation import (EmbodimentOneHotEncoder, ESDistillationKLLoss,
+                                                ESDistillationMSELoss, ESDistillationPolicy,
+                                                MLPActionPolicy, MLPActionPolicyDistribution)
 from compass.distillation.rl_specialists_dataset import RLSpecialistDataModule    # pylint: disable=unused-import
 from compass.distillation.distillation_trainer import ESDistillationTrainer    # pylint: disable=unused-import
+
+# PyTorch 2.6+ defaults torch.load to weights_only=True. Lightning's
+# Trainer.test(ckpt_path=...) internally calls torch.load on our distillation
+# checkpoints, which pickle several COMPASS module classes referenced by
+# gin-bound trainer/loss/policy refs. Allowlist them so the weights-only load
+# succeeds; mirrors the runtime-loader weights_only=False fix already in
+# compass/distillation/distillation.py:161.
+torch.serialization.add_safe_globals([
+    ESDistillationPolicy,
+    ESDistillationKLLoss,
+    ESDistillationMSELoss,
+    EmbodimentOneHotEncoder,
+    MLPActionPolicy,
+    MLPActionPolicyDistribution,
+])
 
 
 class TaskMode(Enum):
@@ -51,7 +70,7 @@ def parse_arguments(task_mode):
     parser.add_argument('--wandb-project-name',
                         '-n',
                         type=str,
-                        default='afm_rl_enhance_distillation',
+                        default='compass',
                         help='The project name of W&B.')
     parser.add_argument('--wandb-run-name',
                         '-r',

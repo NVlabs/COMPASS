@@ -21,6 +21,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.managers import ActionTermCfg
 
 from mobility_es.config import scene_assets
 from mobility_es.config import robots
@@ -32,8 +33,7 @@ from mobility_es.mdp.action.non_holonomic_perfect_control_action import NonHolon
 class CarterActionsCfg:
     """Action specifications for the MDP."""
 
-    drive_joints = mdp.ActionTermCfg(class_type=NonHolonomicPerfectControlAction,
-                                     asset_name="robot")
+    drive_joints = ActionTermCfg(class_type=NonHolonomicPerfectControlAction, asset_name="robot")
 
 
 @configclass

@@ -17,5 +17,5 @@ RLSpecialistDataModule.num_workers=2
 # Embodiment specialist distillation policy
 ESDistillationPolicy.policy_model=@MLPActionPolicyDistribution
 ESDistillationPolicy.embodiment_encoder=@EmbodimentOneHotEncoder
-ESDistillationPolicy.policy_state_dim=2048
+ESDistillationPolicy.policy_state_dim=2050
 ESDistillationPolicy.command_n_channels=6

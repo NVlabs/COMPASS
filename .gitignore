@@ -7,6 +7,7 @@ cscope.*
 imgui.ini
 .dazel_run
 venv/
+.venv/
 .clangd/
 
 # Local setups
@@ -36,3 +37,17 @@ ros2_deployment/assets/
 *.onnx
 *.engine
 *.trt
+
+# Docker dev environment (assets downloaded by docker/prepare_assets.sh, caches
+# from container-side pip / pre-commit / huggingface routed under HOME=/workspace/COMPASS).
+/assets/
+/.cache/
+/.nv/
+/.nvidia-omniverse/
+
+# Sphinx handbook local build output (CI publishes from a separate _site/).
+/docs/handbook/_build/
+
+# Local staging dir produced by mimicking the docs.yml workflow (cp -r
+# docs/project_page/. _site/ && cp -r docs/handbook/_build/html _site/docs).
+/_site/
