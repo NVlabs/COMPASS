@@ -140,6 +140,7 @@ class _NoOpLogger:
     def close(self):
         pass
 
+
 # Map from the embedding type to the RL env config.
 EmbodimentEnvCfgMap = {
     'h1': H1GoalReachingEnvCfg,
