@@ -309,9 +309,37 @@ Scope (commit `9f478af`):
   - `warehouse_single_rack` is the universally easiest scene (78-95% success).
   - `goal_reached + fall_down ≈ 1.0` everywhere — `fall_down` is the dominant failure mode (no meaningful time-out outcomes).
 
-  #### iter-1000 single-GPU baseline (`*_baseline` runs, pool `groot-l40-04`) — pending
+  #### iter-1000 single-GPU baseline (`*_baseline` runs, pool `groot-l40-04`)
 
-  20 cells in flight (4 emb × 5 env). Wandb project: `compass_release_1.6_benchmark`, run-name pattern `bm_<emb>_<env>_release_1_6_iter1000_1gpu`. Numbers will land here when finished.
+  All 20 cells completed. Wandb project `compass_release_1.6_benchmark`, run-name pattern `bm_<emb>_<env>_release_1_6_iter1000_1gpu`.
+
+  Goal-reached rate / fall-down rate per cell:
+
+  | Embodiment | simple_office | warehouse_single_rack | warehouse_multi_rack | combined_single_rack | combined_multi_rack | **avg goal** | **avg fall** |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | carter | 0.630 / 0.369 | **0.950** / 0.042 | 0.792 / 0.145 | 0.872 / 0.111 | 0.887 / 0.092 | **0.826** | **0.152** |
+  | g1     | 0.502 / 0.489 | 0.850 / 0.102 | 0.569 / 0.314 | 0.841 / 0.155 | 0.812 / 0.178 | 0.715 | 0.248 |
+  | spot   | 0.589 / 0.408 | 0.794 / 0.206 | 0.781 / 0.188 | 0.808 / 0.191 | 0.653 / 0.345 | 0.725 | 0.268 |
+  | h1     | 0.500 / 0.455 | 0.812 / 0.111 | 0.506 / 0.338 | 0.795 / 0.175 | 0.783 / 0.138 | 0.679 | 0.243 |
+
+  Per-embodiment `weighted_travel_time` average (lower is better): carter **2,050** · spot 3,992 · g1 5,114 · h1 5,157.
+
+  #### Side-by-side comparison: iter-500 multi-GPU vs iter-1000 single-GPU
+
+  **Per-embodiment averages (Δ = iter-1000 − iter-500):**
+
+  | Emb | iter-500 goal | iter-1000 goal | Δ goal | iter-500 fall | iter-1000 fall | Δ fall | iter-500 wtt | iter-1000 wtt |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | carter | 0.808 | **0.826** | **+0.018** | 0.168 | **0.152** | **−0.016** | 2,293 | **2,050** |
+  | g1     | **0.768** | 0.715 | −0.053 | **0.207** | 0.248 | +0.041 | **4,356** | 5,114 |
+  | spot   | **0.728** | 0.725 | −0.003 | **0.255** | 0.268 | +0.013 | **3,675** | 3,992 |
+  | h1     | **0.711** | 0.679 | −0.032 | 0.271 | **0.243** | −0.028 | **4,451** | 5,157 |
+
+  **Headlines:**
+  - **carter improves on all axes at iter-1000 single-GPU** — converges fastest, benefits from more training.
+  - **Bipeds (g1, h1) are roughly on-par or slightly regress at iter-1000 single-GPU.** Average drift is single-digit pp; per-scene drift is dominated by `warehouse_multi_rack` (g1: −25.9 pp goal, +20.8 pp fall; h1: −20.8 pp goal, +8.8 pp fall). Other scenes are stable.
+  - **Validates §11 multi-GPU PPO numerical equivalence in spirit**: 8 GPUs × 500 iter ≈ 1 GPU × 1000 iter in samples-seen, and the resulting policies are within seed-noise on most cells. The `warehouse_multi_rack` divergence for bipeds is worth flagging in release notes but does not block tag — neither config is strictly worse across the matrix.
+  - **`simple_office` remains the universal weakness** — bipeds in the 50-60% range, carter at 63%. Tighter scene + bipedal locomotion is the dominant failure mode regardless of training config.
 - [ ] All P0 items 🟢
 - [ ] CHANGELOG.md `[1.6.0]` entry drafted (Added / Changed / Fixed / Removed)
 - [ ] Version bump committed
