@@ -55,7 +55,7 @@ parser.add_argument('--logger',
 parser.add_argument('--wandb-project-name',
                     '-n',
                     type=str,
-                    default='afm_rl_enhance',
+                    required=True,
                     help='The project name of W&B.')
 parser.add_argument('--wandb-run-name',
                     '-r',

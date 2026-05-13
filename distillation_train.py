@@ -51,7 +51,7 @@ def parse_arguments(task_mode):
     parser.add_argument('--wandb-project-name',
                         '-n',
                         type=str,
-                        default='afm_rl_enhance_distillation',
+                        required=True,
                         help='The project name of W&B.')
     parser.add_argument('--wandb-run-name',
                         '-r',

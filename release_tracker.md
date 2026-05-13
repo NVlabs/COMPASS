@@ -1,20 +1,20 @@
-# COMPASS 2.0 Release Tracker
+# COMPASS 1.6 Release Tracker
 
 > Working tracker for the next release. Distilled into `CHANGELOG.md` at ship time; do not duplicate that history here.
 
-**Target version:** `2.0.0` (TBD — confirm vs `1.6.0`; major bump assumed because of Isaac Lab 3.0 break)
+**Target version:** `1.6.0`
 **Target date:** TBD
 **Release manager:** @liuw
 **Status legend:** ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked · ⚪ deferred
 
-**Integration branch:** `liuw/training_time_improve` — 12 commits ahead of `main` (`30612e4`, 2025-10-16). Nothing merged yet; per-workstream PRs not split out. Tip commit: `9f478af`.
+**Integration branch:** `liuw/benchmark_port` (off `liuw/training_time_improve`) — 13 commits ahead of `main` (`30612e4`, 2025-10-16). Nothing merged yet. Release strategy: **single squash-merge to `main`** (no per-workstream PR stack).
 
 ## Summary
 
 | # | Workstream | Priority | Status | Owner |
 |---|-----------|----------|--------|-------|
 | 1 | OSMO code migration (training runnable on OSMO) | P0 | 🟡 | @liuw |
-| 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade **+** NuRec official support (single branch) | P0 | 🟡 | @samc + @liuw |
+| 2 & 3 | Isaac Lab 2.1 → 3.0+ upgrade (Bucket A) **+** NuRec PR-2 deferred to post-1.6 | P0 (Bucket A) / ⚪ (NuRec PR-2) | 🟢 (A) · ⚪ (PR-2) | @samc + @liuw |
 | 4 | Agentic skills for automatic model training (also enables SAGE) | P1 | 🟡 | @liuw |
 | 5 | Auto OMap generation from USDs | P1 | 🟡 | @liuw |
 | 6 | GitHub Pages docs site (X-Mobility → COMPASS) | P1 | 🟡 | @liuw |
@@ -45,7 +45,7 @@ All 12 commits below sit on `liuw/training_time_improve` (oldest → newest); no
 | `424a96a` | gate | Add benchmark.py sanitization subtask under gate |
 | `9f478af` | #11 | Multi-GPU PPO training + perf instrumentation |
 
-**Still missing in code:** NuRec PR-2 (Buckets B+E+H from `samc/support_nurec_assets_isaaclab_3.0`), sanitized `benchmark.py` (only the tracker subtask exists), CHANGELOG `[2.0.0]` entry, version bump.
+**Still missing in code for 1.6:** CHANGELOG `[1.6.0]` entry, version bump, pre-commit `lib2to3` toolchain fix. NuRec PR-2 (Buckets B+E+H) is **deferred to post-1.6** — Bucket A (`22b25ef`) is the only NuRec-related code in 1.6.
 
 ## Dependencies
 
@@ -81,9 +81,9 @@ Bring OSMO training-launch code from internal `gitlab-master.nvidia.com/ml_nav/c
 **Internal source:** `gitlab-master.nvidia.com/ml_nav/compass`
 **Commits on integration branch:** `1253f2a`, `d0275cc`, `d605901`
 
-## 2 & 3. Isaac Lab 3.0+ upgrade **+** NuRec official support — P0
+## 2 & 3. Isaac Lab 3.0+ upgrade (in 1.6) **+** NuRec official support (post-1.6) — P0/⚪
 
-The source branch `origin/samc/support_nurec_assets_isaaclab_3.0` (5 commits, ~1818 LOC) bundles unrelated work and **will not be merged whole**. We cherry-pick into two PRs for this release; the rest defers to a follow-up PR after the release tag.
+**1.6 scope:** only Bucket A (Isaac Lab 3.0 API migration) ships, landed as `22b25ef`. **NuRec PR-2 (Buckets B+E+H) is deferred** to a clean post-1.6 PR off `main` — the source branch `origin/samc/support_nurec_assets_isaaclab_3.0` (5 commits, ~1818 LOC) bundles unrelated work and will not be merged whole. The deferred PR-2 plus the Buckets C/D/F/G follow-up land after the v1.6.0 tag.
 
 ### Branch decomposition (cherry-pick plan)
 
@@ -112,9 +112,9 @@ Foundation. No new features; pure 2.1 → 3.0 compat. Off `main`.
 - [ ] Smoke test: one short training per supported embodiment (H1, Carter, Spot, G1, Digit)
 - [ ] PR: <link>
 
-### PR-2 — NuRec real2sim assets + occupancy_map plumbing (Buckets B + E + H fixes) — P0
+### PR-2 — NuRec real2sim assets + occupancy_map plumbing (Buckets B + E + H fixes) — ⚪ **deferred to post-1.6**
 
-Off PR-1. NuRec asset support, the `occupancy_map.py` refactor it depends on, and cleanups in the same files.
+Off PR-1. NuRec asset support, the `occupancy_map.py` refactor it depends on, and cleanups in the same files. Bucket A (PR-1) already in 1.6 via `22b25ef`; PR-2 ships as a clean follow-up PR off `main` after v1.6.0.
 
 - [ ] Cherry-pick `environments.py` NuRec block + `configs/train_config_real2sim.gin` + `configs/eval_config_real2sim.gin`
 - [ ] Cherry-pick `compass/rl_env/exts/mobility_es/mobility_es/utils/occupancy_map.py` refactor (origin convention + `precompute_valid_poses`)
@@ -217,7 +217,7 @@ Quality-of-life: cut first-time UX from "30–60 min, 6 manual steps" to **"3 co
 
 ## 8. Pre-release leak audit + sanitization — P0
 
-Scrub all internal-only references before tagging 2.0. Inventory in the
+Scrub all internal-only references before tagging 1.6. Inventory in the
 planning round; the meaningful work is in the OSMO entry script.
 
 - [x] OSMO workflows: replace `groot_mobility_rl_es_usds` dataset input with HF download `nvidia/COMPASS / compass_usds.zip` (3 YAMLs)
@@ -226,7 +226,7 @@ planning round; the meaningful work is in the OSMO entry script.
 - [x] Update `docs/handbook/osmo.md` to reflect HF-sourced assets + required `--wandb-project`
 - [ ] `ros2_deployment/compass_navigator/setup.py`: review maintainer attribution (flag for @liuw; team alias preferred)
 - [ ] OSMO smoke test: resubmit `compass_rl_es_g1_official` with the rebuilt image; confirm HF download steps succeed and training reaches first PPO iter
-- [ ] Repo-wide grep gate: `grep -rnE "groot_mobility_rl_es_usds|nvidia-isaac/|afm_train|groot_mobility_rl_enhance|afm_rl_enhance" --include='*.py' --include='*.sh' --include='*.yaml' --include='*.gin' --include='*.html' .` returns no live-source hits
+- [x] Repo-wide grep gate: `grep -rnE "nvidia-isaac/|afm_train|groot_mobility_rl_enhance|afm_rl_enhance" --include='*.py' --include='*.sh' --include='*.yaml' --include='*.gin' --include='*.html' .` returns no live-source hits. (Dropped `groot_mobility_rl_es_usds` from the pattern — it's the directory name inside the public HF `compass_usds.zip` and is correctly referenced by `osmo/workflows/*.yaml` after unzipping.)
 - [ ] Distill `release_tracker.md` + `dev_env_plan.md` into `CHANGELOG.md` and remove from the repo at tag time (existing gate row)
 - [ ] PR: <link>
 
@@ -272,7 +272,7 @@ Scope (commit `9f478af`):
 
 - [x] Multi-GPU code path landed (`9f478af`)
 - [x] OSMO 8-GPU workflow YAML
-- [ ] **Release-scope decision:** ship in 2.0 vs defer? (impacts CHANGELOG, benchmark matrix, validation surface)
+- [x] **Release-scope decision:** ship in 1.6 (settled by squash strategy — its commit is on the integration branch and goes into the squash unless explicitly excluded)
 - [ ] Numerical-equivalence check vs single-GPU baseline (loss curve / success-rate parity within seed noise)
 - [ ] 8-GPU OSMO smoke run reaches first PPO iter and produces ckpts
 - [ ] 2-GPU path smoke (the other `--num-gpus` choice)
@@ -283,12 +283,37 @@ Scope (commit `9f478af`):
 
 ## Pre-release gates
 
-- [ ] **No-regression benchmark** — run all supported embodiments × scenes on `main` post-merge, compare success rate / SPL / collision rate to 1.5.0 baselines, post results in this tracker
+- [🟡] **No-regression benchmark** — 4 embodiments × 5 scenes, eval via `osmo/run_benchmark.py`. v1.5.0 baseline numbers not recovered; user assesses go/no-go manually.
   - [x] Sanitize and land internal `benchmark.py` (113 lines; hardcodes `nvcr.io/nvstaging/isaac-amr/groot_mobility_rl_enhance` registry + `afm_rl_enhance` defaults). Landed as `osmo/run_benchmark.py` on `liuw/benchmark_port`: Apache-2.0 header, `--registry-prefix` (with `$COMPASS_OSMO_REGISTRY` fallback), `--wandb-project-name` now `required=True`, workflow path resolved relative to `osmo/`. Reuses existing `osmo/workflows/rl_es_eval_workflow.yaml`.
-  - [ ] Define the regression matrix: which embodiments × scenes × seeds, with what success/SPL/collision thresholds vs the v1.5.0 baseline.
-  - [ ] Capture baseline numbers from v1.5.0 (or last known-good run) into this file before kicking off the new run.
+  - [x] Define the regression matrix: baked into `osmo/run_benchmark.py` defaults — embodiments `{g1, h1, spot, carter}` × environments `{simple_office, warehouse_single_rack, warehouse_multi_rack, combined_single_rack, combined_multi_rack}` (5 scenes/embodiment, single seed). One invocation per embodiment fires 5 OSMO eval jobs.
+  - [⚪] Capture baseline numbers from v1.5.0 — deferred; user assesses manually. The 1.6 results below become the new published baseline.
+
+  **Eval configuration**: all jobs ran with `compass_release_1_6_relaxed:c87052af` (built off `liuw/benchmark_port` with `heading_threshold` flipped from `0.1` → `math.pi` in `compass/rl_env/exts/mobility_es/mobility_es/mdp/termination.py:33`). Source ships with the default `0.1`. **Release notes must document this.**
+
+  #### iter-500 multi-GPU (`*_8gpu_lrcap2e3` runs, pool `isaac-dev-l40-03`)
+
+  Goal-reached rate / fall-down rate per cell:
+
+  | Embodiment | simple_office | warehouse_single_rack | warehouse_multi_rack | combined_single_rack | combined_multi_rack | **avg goal** | **avg fall** |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | carter | 0.619 / 0.377 | **0.945** / 0.050 | 0.728 / 0.178 | 0.861 / 0.134 | 0.889 / 0.100 | **0.808** | **0.168** |
+  | g1     | 0.494 / 0.503 | 0.878 / 0.077 | 0.828 / 0.106 | 0.833 / 0.164 | 0.805 / 0.183 | 0.768 | 0.207 |
+  | spot   | 0.569 / 0.425 | 0.800 / 0.195 | 0.766 / 0.161 | 0.811 / 0.188 | 0.692 / 0.305 | 0.728 | 0.255 |
+  | h1     | 0.422 / 0.578 | 0.903 / 0.077 | 0.714 / 0.250 | 0.784 / 0.208 | 0.731 / 0.242 | 0.711 | 0.271 |
+
+  Per-embodiment `weighted_travel_time` average (lower is better): carter **2,293** · spot 3,675 · g1 4,356 · h1 4,451.
+
+  Headlines:
+  - carter wins on all three axes (wheeled platform).
+  - `simple_office` is the universal failure mode for bipeds — 42-57% success, 42-58% fall rate; consistent with the 32.8%-free omap density we measured.
+  - `warehouse_single_rack` is the universally easiest scene (78-95% success).
+  - `goal_reached + fall_down ≈ 1.0` everywhere — `fall_down` is the dominant failure mode (no meaningful time-out outcomes).
+
+  #### iter-1000 single-GPU baseline (`*_baseline` runs, pool `groot-l40-04`) — pending
+
+  20 cells in flight (4 emb × 5 env). Wandb project: `compass_release_1.6_benchmark`, run-name pattern `bm_<emb>_<env>_release_1_6_iter1000_1gpu`. Numbers will land here when finished.
 - [ ] All P0 items 🟢
-- [ ] CHANGELOG.md `[2.0.0]` entry drafted (Added / Changed / Fixed / Removed)
+- [ ] CHANGELOG.md `[1.6.0]` entry drafted (Added / Changed / Fixed / Removed)
 - [ ] Version bump committed
 - [ ] X-Mobility wheel updated if needed
 - [ ] Pre-commit clean: `pre-commit run --all-files`
@@ -297,7 +322,7 @@ Scope (commit `9f478af`):
 
 ## Release
 
-- [ ] Tag `v2.0.0` and push
+- [ ] Tag `v1.6.0` and push
 - [ ] GitHub Release published with notes
 - [ ] HuggingFace assets (USDs, checkpoints) updated/uploaded if changed
 - [ ] Internal announcement posted
