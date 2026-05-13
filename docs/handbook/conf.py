@@ -19,8 +19,8 @@ project = "COMPASS"
 copyright = "2025-2026, NVIDIA"
 author = "NVIDIA"
 
-# Bump alongside CHANGELOG.md / pyproject.toml when we cut a release.
-COMPASS_VERSION = "2.0.0"
+# Bump alongside CHANGELOG.md when we cut a release.
+COMPASS_VERSION = "1.6.0"
 version = COMPASS_VERSION
 release = COMPASS_VERSION
 
