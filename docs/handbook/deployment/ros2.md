@@ -44,7 +44,10 @@ integrating visual SLAM solutions such as
 for robot state estimation, the COMPASS model can support zero-shot sim2real
 transfer.
 
-<https://github.com/user-attachments/assets/141af4f6-c915-4254-b6a0-00706e4aea5f>
+<video controls autoplay loop muted playsinline width="100%">
+  <source src="https://github.com/user-attachments/assets/141af4f6-c915-4254-b6a0-00706e4aea5f" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## 3. Object navigation integration
 
@@ -54,4 +57,7 @@ with COMPASS. The `obj_target_generator` node can convert localized object
 bounding boxes into navigation goals, allowing the robot to autonomously
 approach specified objects.
 
-<https://github.com/user-attachments/assets/3928e9fd-f78d-4b8e-8bbc-9932b386ae6b>
+<video controls autoplay loop muted playsinline width="100%">
+  <source src="https://github.com/user-attachments/assets/3928e9fd-f78d-4b8e-8bbc-9932b386ae6b" type="video/mp4">
+  Your browser does not support the video tag.
+</video>

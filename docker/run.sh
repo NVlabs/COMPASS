@@ -32,6 +32,11 @@ CONTAINER_NAME="compass-$(id -un)-${_REPO_HASH}"
 
 # Writable shader cache lives outside the repo so a `git clean` doesn't nuke it.
 KIT_CACHE_DIR="${HOME}/.cache/compass/kit"
+# Kit's persistent-state dir (pip-extension venv, user.config.json, screenshots).
+# /isaac-sim/kit/data in the image is mode 750 root:isaac-sim — readable but not
+# writable by our host-uid user, so Kit spams PermissionError on every launch.
+# Mounting a host-uid-owned dir over it silences the noise.
+KIT_DATA_DIR="${HOME}/.cache/compass/kit-data"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Output helpers (lifted from ros2_deployment/prepare_assets.sh).
@@ -50,7 +55,7 @@ step()    { echo -e "${BLUE}[STEP]${NC} $*"; }
 CONT_REPO_DIR="/workspace/COMPASS"
 
 _compass_run_args() {
-    mkdir -p "${KIT_CACHE_DIR}"
+    mkdir -p "${KIT_CACHE_DIR}" "${KIT_DATA_DIR}"
     local args=(
         --name "${CONTAINER_NAME}"
         --gpus all
@@ -67,6 +72,7 @@ _compass_run_args() {
         -v "${REPO_ROOT}:${CONT_REPO_DIR}"
         -v "/tmp/.X11-unix:/tmp/.X11-unix:rw"
         -v "${KIT_CACHE_DIR}:/isaac-sim/kit/cache"
+        -v "${KIT_DATA_DIR}:/isaac-sim/kit/data"
         # HOME=/workspace/COMPASS puts pip / pre-commit / huggingface caches under
         # the bind-mount so they survive `down` + `up`. Caches land in ./.cache/
         # which is gitignored.
@@ -196,6 +202,7 @@ cmd_status() {
     fi
     echo "Repo root: ${REPO_ROOT}"
     echo "Kit cache: ${KIT_CACHE_DIR}"
+    echo "Kit data:  ${KIT_DATA_DIR}"
 }
 
 usage() {
