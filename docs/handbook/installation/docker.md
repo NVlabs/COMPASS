@@ -34,7 +34,7 @@ with the host CWD translated to the container path. `deactivate` reverts.
 
 - Docker (Engine 24+ recommended)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) so `--gpus all` works
-- An NVIDIA GPU
+- An NVIDIA GPU + driver that satisfy the upstream [Isaac Lab system requirements](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta/source/setup/installation/index.html#system-requirements)
 - A HuggingFace account with access to [nvidia/COMPASS](https://huggingface.co/nvidia/COMPASS) and a [token](https://huggingface.co/settings/tokens)
 - An X server (only if you want `--viz kit` to render — headless training works fine without)
 

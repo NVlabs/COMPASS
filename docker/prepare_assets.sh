@@ -35,7 +35,11 @@ FORCE=false
 
 USDS_URL="https://huggingface.co/nvidia/COMPASS/resolve/main/compass_usds.zip"
 USDS_ZIP="${CACHE_DIR}/compass_usds.zip"
-USDS_DIR="${CACHE_DIR}/usd"
+# Canonical install location — `mobility_es` config files reference USDs as
+# `os.path.join(os.path.dirname(__file__), "../usd/...")`, so the tree must
+# live next to `config/` inside the extension. Matches what the OSMO train
+# workflow does (osmo/workflows/rl_es_train_workflow.yaml).
+USDS_DIR="${REPO_ROOT}/compass/rl_env/exts/mobility_es/mobility_es/usd"
 
 CKPT_URL="https://huggingface.co/nvidia/X-Mobility/resolve/main/x_mobility-nav2-semantic_action_path.ckpt"
 CKPT_FILE="${CACHE_DIR}/x_mobility.ckpt"
@@ -51,9 +55,10 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --hf-token) HF_TOKEN_ARG="$2"; shift 2 ;;
         --cache-dir)
+            # --cache-dir only redirects the zip + ckpt cache. USDS_DIR is
+            # fixed by the package layout (see definition above).
             CACHE_DIR="$2"
             USDS_ZIP="${CACHE_DIR}/compass_usds.zip"
-            USDS_DIR="${CACHE_DIR}/usd"
             CKPT_FILE="${CACHE_DIR}/x_mobility.ckpt"
             shift 2
             ;;
@@ -119,7 +124,7 @@ download_usds() {
         rm -rf "${USDS_DIR}" "${USDS_ZIP}"
     fi
     if [ -d "${USDS_DIR}" ] && [ -n "$(ls -A "${USDS_DIR}" 2>/dev/null)" ]; then
-        info "USDs already extracted at ${USDS_DIR} — skipping."
+        info "USDs already installed at ${USDS_DIR} — skipping."
         return 0
     fi
 
@@ -132,14 +137,33 @@ download_usds() {
         exit 1
     fi
 
-    step "Unzipping → ${USDS_DIR}"
     if ! command -v unzip >/dev/null 2>&1; then
         error "unzip is not installed. Install it (e.g. apt-get install unzip)."
         exit 1
     fi
+
+    # The HF zip wraps everything in `groot_mobility_rl_es_usds/usd/<scene>/…`.
+    # Stage to a temp dir, then move the inner `usd/` contents into USDS_DIR
+    # (mirrors osmo/workflows/rl_es_train_workflow.yaml).
+    local stage_dir
+    stage_dir="$(mktemp -d "${CACHE_DIR}/usd_stage.XXXXXX")"
+    step "Unzipping → ${stage_dir}"
+    unzip -q -o "${USDS_ZIP}" -d "${stage_dir}"
+
+    local inner="${stage_dir}/groot_mobility_rl_es_usds/usd"
+    if [ ! -d "${inner}" ]; then
+        error "Unexpected zip layout: ${inner} not found after extraction."
+        error "Contents of ${stage_dir}:"
+        ls -la "${stage_dir}" >&2
+        rm -rf "${stage_dir}"
+        exit 1
+    fi
+
+    step "Installing → ${USDS_DIR}"
     mkdir -p "${USDS_DIR}"
-    unzip -q -o "${USDS_ZIP}" -d "${USDS_DIR}"
-    info "USDs extracted to ${USDS_DIR}"
+    mv "${inner}"/* "${USDS_DIR}/"
+    rm -rf "${stage_dir}"
+    info "USDs installed to ${USDS_DIR}"
 }
 
 download_ckpt() {
@@ -184,9 +208,10 @@ show_summary() {
         echo "  ✗ X-Mobility ckpt: ${CKPT_FILE} (missing)"
     fi
     echo ""
-    echo "These paths are bind-mounted into the container at:"
-    echo "  /workspace/assets/usd"
-    echo "  /workspace/assets/x_mobility.ckpt"
+    echo "The repo is bind-mounted at /workspace/COMPASS inside the container."
+    echo "USDs are picked up automatically by the mobility_es extension."
+    echo "Pass the X-Mobility checkpoint via -b/--base-policy-path, e.g.:"
+    echo "  -b ${CKPT_FILE#${REPO_ROOT}/}"
 }
 
 main() {

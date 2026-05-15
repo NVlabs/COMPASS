@@ -29,6 +29,8 @@ COMPASS is a framework for cross-embodiment mobility that combines:
 
 ## Quick start
 
+> Requires Docker + the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), and an NVIDIA GPU + driver that meet the [Isaac Lab system requirements](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta/source/setup/installation/index.html#system-requirements).
+
 ```bash
 git clone https://github.com/NVlabs/COMPASS.git && cd COMPASS
 

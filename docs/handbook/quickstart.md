@@ -6,7 +6,8 @@ The fastest path to a training shell, using the [Docker-as-venv dev environment]
 
 - Docker (Engine 24+) with the
   [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-- An NVIDIA GPU
+- An NVIDIA GPU + driver that satisfy the upstream
+  [Isaac Lab system requirements](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta/source/setup/installation/index.html#system-requirements)
 - A HuggingFace account with [token](https://huggingface.co/settings/tokens)
   and access to [nvidia/COMPASS](https://huggingface.co/nvidia/COMPASS)
 
