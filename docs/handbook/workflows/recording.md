@@ -36,7 +36,8 @@ by the specialist. The shape convention is `[T, S, ...]` (timesteps × shards).
 ## On OSMO
 
 The X-Mobility base ckpt and COMPASS USDs are downloaded inside the workflow
-from HuggingFace, so no `--base-policy-ckpt` flag is needed.
+from HuggingFace, so you don't need to pass the base-policy checkpoint or
+USDs locally.
 
 ```bash
 export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
