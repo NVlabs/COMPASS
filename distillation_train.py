@@ -25,8 +25,8 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 
 from compass.distillation.distillation import (EmbodimentOneHotEncoder, ESDistillationKLLoss,
-                                                ESDistillationMSELoss, ESDistillationPolicy,
-                                                MLPActionPolicy, MLPActionPolicyDistribution)
+                                               ESDistillationMSELoss, ESDistillationPolicy,
+                                               MLPActionPolicy, MLPActionPolicyDistribution)
 from compass.distillation.rl_specialists_dataset import RLSpecialistDataModule    # pylint: disable=unused-import
 from compass.distillation.distillation_trainer import ESDistillationTrainer    # pylint: disable=unused-import
 

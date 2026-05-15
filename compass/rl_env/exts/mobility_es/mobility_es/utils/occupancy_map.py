@@ -68,9 +68,8 @@ class OccupancyMapCollisionChecker:
                     print(f"Auto-discovered ROS-convention omap sibling of USD: {candidate}")
 
         if yaml_file_path and os.path.exists(yaml_file_path):
-            print(
-                f'Loaded omap for env {env_prim_path} '
-                f'(origin convention: {self.__origin_convention})')
+            print(f'Loaded omap for env {env_prim_path} '
+                  f'(origin convention: {self.__origin_convention})')
             self._load_grid_map(yaml_file_path)
 
     def _load_grid_map(self, yaml_file_path):
@@ -103,18 +102,16 @@ class OccupancyMapCollisionChecker:
         # NOTE: world x points right and world y points up. Image columns point
         # right and image rows point down, so y depends on the YAML origin convention.
         resolution = self.__map_meta["resolution"]
-        i_x = torch.floor(
-            (p_x - self.__map_meta["origin"][0]) / resolution).reshape(
-                (point.shape[0], 1))
+        i_x = torch.floor((p_x - self.__map_meta["origin"][0]) / resolution).reshape(
+            (point.shape[0], 1))
         if self.__origin_convention == "bottom-left":
             height_meters = self.__grid_map.shape[0] * resolution
             i_y = torch.floor(
                 (self.__map_meta["origin"][1] + height_meters - p_y) / resolution).reshape(
                     (point.shape[0], 1))
         else:
-            i_y = torch.floor(
-                (self.__map_meta["origin"][1] - p_y) / resolution).reshape(
-                    (point.shape[0], 1))
+            i_y = torch.floor((self.__map_meta["origin"][1] - p_y) / resolution).reshape(
+                (point.shape[0], 1))
         return torch.cat((i_x, i_y), dim=1).int()
 
     def __is_obstacle_in_distance(self, img_point, distance_in_pixel):
