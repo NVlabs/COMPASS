@@ -13,11 +13,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# COMPASS_HOST_SIDE: true -- do not run inside the docker container.
+# The `python` shim from `source ./docker/activate` scans for this marker and
+# auto-routes the script to host Python (which has docker / osmo CLIs).
 """Submit COMPASS training/eval/record/distill workflows to OSMO.
 
 Replaces the interactive shell launcher used in the internal repo with a
 non-interactive Python CLI. Reads credentials from environment variables
 (``WANDB_API_KEY``, ``HF_TOKEN``) with an opt-in ``--prompt`` fallback.
+
+Run host-side — this script shells out to ``docker build``, ``docker push``,
+and ``osmo workflow submit``, none of which exist inside the COMPASS runtime
+container. The ``# COMPASS_HOST_SIDE: true`` marker above causes the
+``source ./docker/activate`` shim to auto-route this launcher to host Python,
+so plain ``python osmo/run_osmo.py …`` works from the activated shell. On
+a stale shim, fall back to ``/usr/bin/python3 osmo/run_osmo.py …`` or
+refresh with ``deactivate && source ./docker/activate``.
 
 Usage:
     # Pre-built image, env vars already exported. The X-Mobility base

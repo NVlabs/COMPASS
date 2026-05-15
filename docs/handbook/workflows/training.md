@@ -92,6 +92,12 @@ Train on the OSMO cluster instead of locally. The X-Mobility base ckpt and
 COMPASS USDs are downloaded inside the workflow from HuggingFace, so you
 don't need to pass the base-policy checkpoint or USDs locally.
 
+`osmo/run_osmo.py` is **host-side** (it shells out to `docker` and `osmo` CLIs).
+The activate shim auto-routes it to host Python via the `# COMPASS_HOST_SIDE`
+marker, so plain `python osmo/run_osmo.py …` works from the activated shell —
+see the host-side callout in [OSMO cloud submission](../osmo.md) for the full
+explanation and fallbacks.
+
 ```bash
 export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
 export WANDB_API_KEY=...

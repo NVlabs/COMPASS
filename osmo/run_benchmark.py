@@ -13,6 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# COMPASS_HOST_SIDE: true -- do not run inside the docker container.
+# The `python` shim from `source ./docker/activate` scans for this marker and
+# auto-routes the script to host Python (which has docker / osmo CLIs).
 """Submit COMPASS no-regression benchmark jobs to OSMO.
 
 Fires one ``rl_es_eval_workflow.yaml`` submission per ``--environments`` entry,
@@ -23,6 +27,14 @@ Results land in W&B at ``<wandb-project-name>/bm_<embodiment>_<environment>_<exp
 Each run logs ``eval/goal_reached_rate``, ``eval/fall_down_rate``,
 ``eval/total_travel_time``, and ``eval/weighted_travel_time`` -- pull those out
 of W&B for the regression assessment.
+
+Run host-side — this script shells out to ``docker build``, ``docker push``,
+and ``osmo workflow submit``, none of which exist inside the COMPASS runtime
+container. The ``# COMPASS_HOST_SIDE: true`` marker above causes the
+``source ./docker/activate`` shim to auto-route this launcher to host Python,
+so plain ``python osmo/run_benchmark.py …`` works from the activated shell.
+On a stale shim, fall back to ``/usr/bin/python3 osmo/run_benchmark.py …``
+or refresh with ``deactivate && source ./docker/activate``.
 
 Usage:
     export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>

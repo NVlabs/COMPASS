@@ -39,6 +39,12 @@ already wired; on bare-metal install, prefix with `${ISAACLAB_PATH}/isaaclab.sh 
 
 ## Submitting to OSMO
 
+`osmo/run_osmo.py` is **host-side** (it shells out to `docker` and `osmo` CLIs).
+The activate shim auto-routes it to host Python via the `# COMPASS_HOST_SIDE`
+marker, so plain `python osmo/run_osmo.py …` works from the activated shell —
+see the host-side callout in [OSMO cloud submission](../osmo.md) for the full
+explanation and fallbacks.
+
 ```bash
 python osmo/run_osmo.py distill \
     --experiment-name <name> \

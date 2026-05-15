@@ -339,7 +339,9 @@ Headless is the default in Isaac Lab 3.0 — omit `--viz` entirely (or use `--vi
 
 ### OSMO cluster submission
 
-The Python launcher in [osmo/run_osmo.py](../../../osmo/run_osmo.py) handles build+push+submit and is the recommended entry point:
+The Python launcher in [osmo/run_osmo.py](../../../osmo/run_osmo.py) handles build+push+submit and is the recommended entry point.
+
+`run_osmo.py` is **host-side** — it shells out to `docker build`, `docker push`, and `osmo workflow submit`, none of which exist inside the COMPASS runtime container. The `python` shim from `source ./docker/activate` recognizes this via a `# COMPASS_HOST_SIDE: true` marker at the top of the launcher and auto-routes it to host Python, so plain `python osmo/run_osmo.py …` works from the activated shell. If the user sourced the activate script before the marker-aware shim shipped, have them `deactivate && source ./docker/activate` to refresh, or fall back to `/usr/bin/python3 osmo/run_osmo.py …`.
 
 ```bash
 export WANDB_API_KEY=<key>
@@ -357,7 +359,7 @@ The X-Mobility base checkpoint is now downloaded inside the workflow from `huggi
 | Parameter | Default | Source |
 |-----------|---------|--------|
 | num_iterations | 1000 | train_config.gin |
-| num_envs | 64 | train_config.gin |
+| num_envs | 32 | train_config.gin |
 | num_steps_per_iteration | 256 | shared.gin |
 | seed | 20 | train_config.gin |
 | embodiment | g1 | shared.gin |

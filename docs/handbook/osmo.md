@@ -16,6 +16,17 @@ The COMPASS USDs (`compass_usds.zip`) and the X-Mobility base-policy
 checkpoint are downloaded inside the workflow directly from HuggingFace
 on every run — no OSMO-dataset or wandb-artifact mirroring required.
 
+> **Run host-side, not inside the container.** `osmo/run_osmo.py` shells out
+> to `docker build`, `docker push`, and the `osmo` CLI — none of which are
+> installed in the COMPASS runtime container. The `python` shim from
+> `source ./docker/activate` recognizes this via a `# COMPASS_HOST_SIDE: true`
+> marker at the top of both `osmo/run_osmo.py` and `osmo/run_benchmark.py`,
+> and auto-routes those launchers to host Python — so plain
+> `python osmo/run_osmo.py …` works from the activated shell. If you're on
+> an old activate shell that predates this marker (sourced before the change
+> shipped), `deactivate && source ./docker/activate` to refresh, or fall
+> back to `/usr/bin/python3 osmo/run_osmo.py …`.
+
 ## Quick start
 
 ```bash
@@ -121,7 +132,8 @@ For repeated runs against the same code, build the image once and pass it via
 ## Troubleshooting
 
 - **`ERROR: $WANDB_API_KEY is not set`** — export it, or pass `--prompt` to be asked interactively.
-- **`ERROR: --image not given and --registry-prefix is empty`** — either supply `--image <pre-built>` or set `--registry-prefix` / `$COMPASS_OSMO_REGISTRY`.
+- **`ERROR: --image not given and --registry-prefix is empty`** — either supply `--image <pre-built>` or set `--registry-prefix` / `$COMPASS_OSMO_REGISTRY`. If you're sure you exported `COMPASS_OSMO_REGISTRY` and still get this from an activated shell, your shim predates the auto-routing change — `deactivate && source ./docker/activate` to regenerate it, or fall back to `/usr/bin/python3 osmo/run_osmo.py …`.
+- **`FileNotFoundError: 'docker'`** — same root cause: the launcher is running *inside* the COMPASS container (no `docker` CLI there). Either your activate shim is stale (refresh it) or you removed the `# COMPASS_HOST_SIDE: true` marker from the launcher.
 - **`manifest unknown` from `osmo workflow submit`** — the image hasn't pushed yet (or you don't have read access). Re-run `docker push <image>` and retry.
 - **Workflow logs** — visit your OSMO console; the workflow ID printed by `osmo workflow submit` is the lookup key.
 - **HuggingFace download fails inside the workflow** — verify `HF_TOKEN` was exported and that your account has access to [`nvidia/COMPASS`](https://huggingface.co/nvidia/COMPASS) and [`nvidia/X-Mobility`](https://huggingface.co/nvidia/X-Mobility).
