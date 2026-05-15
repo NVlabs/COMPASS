@@ -37,7 +37,7 @@ export HF_TOKEN=hf_xxx                    # https://huggingface.co/settings/toke
 ./docker/run.sh build                     # build the dev image                  (~10 min)
 source ./docker/activate                  # venv-like activation (prompt: (compass-rl))
 
-python run.py -c configs/train_config.gin -o /tmp/out -b ./assets/x_mobility.ckpt --enable_cameras
+python run.py -c configs/train_config.gin -o /tmp/out -b ./assets/x_mobility.ckpt --enable_cameras --num_envs 1 --visualizer kit
 ```
 
 `python` is now a shim that runs inside the container. Edit code with your host

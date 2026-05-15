@@ -49,10 +49,13 @@ python run.py \
     -o /tmp/out \
     -b ./assets/x_mobility.ckpt \
     --num_envs 1 \
-    --enable_cameras
+    --enable_cameras \
+    --visualizer kit
 ```
 
-You should see Isaac Sim boot, the scene load, and PPO step into iteration 0.
+You should see the Kit window pop up, Isaac Sim boot, the scene load, and PPO
+step into iteration 0. Drop `--visualizer kit` for a headless smoke (faster,
+no GUI overhead).
 
 ## Next steps
 
