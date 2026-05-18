@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.6.0] - TBD
+## [1.6.0] - 2026-05-18
 
 ### Added
 - OSMO cloud submission: `osmo/run_osmo.py` + four workflow YAMLs (train / eval / record / distillation). Assets (X-Mobility base checkpoint, COMPASS USDs) download from HuggingFace inside the workflow; W&B / HF tokens routed via env vars or interactive `--prompt`. Includes `--embodiment` / `--environment` overrides for multi-embodiment training sweeps without YAML hand-edits.
