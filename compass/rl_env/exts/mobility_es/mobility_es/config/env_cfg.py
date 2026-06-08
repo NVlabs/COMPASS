@@ -166,7 +166,7 @@ class CommandsCfg:
     goal_pose = commands_cfg.UniformCollisionFreePose2dCommandCfg(
         asset_name="robot",
         resampling_time_range=(EPISODE_LENGTH_S, EPISODE_LENGTH_S),
-        debug_vis=False,
+        debug_vis=True,
         simple_heading=False,
         ranges=commands_cfg.UniformCollisionFreePose2dCommandCfg.Ranges(
             pos_x=(-5, 5),
@@ -208,6 +208,8 @@ class EventCfg:
                 "pitch": (0.0, 0.0),
                 "yaw": (0.0, 0.0),
             },
+            # Default collision distance for start pose sampling
+            "collision_distance": 0.75,
         },
     )
 

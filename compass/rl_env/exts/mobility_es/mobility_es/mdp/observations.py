@@ -59,8 +59,8 @@ def camera_to_world(env: RLESEnvWrapper):
         torch.Tensor: Batch of 4x4 transform matrices [B, 4, 4]
     """
     camera = env.scene["camera"]
-    pos_w = camera.data.pos_w
-    quat_w_world = camera.data.quat_w_world
+    pos_w = wp.to_torch(camera.data.pos_w)
+    quat_w_world = wp.to_torch(camera.data.quat_w_world)
     quat_w_world = convert_camera_frame_orientation_convention(quat_w_world,
                                                                origin="world",
                                                                target="ros")

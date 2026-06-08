@@ -42,6 +42,10 @@ USD_PATHS = {
                      "../usd/simple_warehouse_no_roof/simple_warehouse_no_roof.usd"),
     'Hospital':
         f'{ISAAC_NUCLEUS_DIR}/Environments/Hospital/hospital.usd',
+    # NuRec scenes are registered programmatically below (see NUREC_SCENES).
+    # This is example manual entry scene kept for reference.
+    # 'NovaCarterGalileo_NuRec':
+    #     os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/3dgrt/real2sim_galileo.usd"),
 }
 
 # Values may be a string path for legacy COMPASS top-left-origin maps, or a dict
@@ -64,6 +68,13 @@ OMAP_PATHS = {
         os.path.join(os.path.dirname(__file__), "../usd/office/omap/occupancy_map.yaml"),
     'Hospital':
         os.path.join(os.path.dirname(__file__), "../usd/hospital/omap/occupancy_map.yaml"),
+    # NuRec scenes are registered programmatically below (see NUREC_SCENES).
+    # Example to show how we can define OMAP_PATHS with origin_convention
+    # 'NovaCarterGalileo_NuRec':
+    #     {
+    #         "path": os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/occupancy_map.yaml"),
+    #         "origin_convention": "bottom-left"
+    #     },
 }
 
 
@@ -80,6 +91,71 @@ class EnvSceneAssetCfg(AssetBaseCfg):
 
     # Replicate physics in the scene.
     replicate_physics = True
+
+
+# ---------------------------------------------------------------------------
+# NuRec Real2Sim scenes (PhysicalAI-Robotics-NuRec dataset).
+#
+# Every NuRec scene shares the same flat asset layout and spawn config; only the
+# scene folder differs. To add a scene: place its folder under ``usd/<folder>/``
+# containing ``particle_ppispon_spg.usdz`` (SPG Gaussian scene, PPISP baked in)
+# and ``occupancy_map.yaml`` (ROS bottom-left origin), then add one line below.
+# The loop registers USD_PATHS / OMAP_PATHS and builds the cfg objects.
+# ---------------------------------------------------------------------------
+NUREC_USD_FILE = "particle_ppispon_spg.usdz"
+NUREC_OMAP_FILE = "occupancy_map.yaml"
+NUREC_ORIGIN_CONVENTION = "bottom-left"
+
+# asset folder / ``--environment`` alias  ->  prim-path leaf (valid USD identifier)
+NUREC_SCENES = {
+    "nova_carter-galileo": "NovaCarterGalileo_NuRec",
+    "nova_carter-cafe": "NovaCarterCafe_NuRec",
+    "hand_hold-endeavor-andoria": "HandHoldEndeavorAndoria_NuRec",
+    "hand_hold-endeavor-livingroom": "HandHoldEndeavorLivingroom_NuRec",
+    "hand_hold-endeavor-wormhole": "HandHoldEndeavorWormhole_NuRec",
+    "hand_hold-endeavor-wormhole-table": "HandHoldEndeavorWormholeTable_NuRec",
+    "hand_hold-voyager-babyboom": "HandHoldVoyagerBabyboom_NuRec",
+}
+
+
+def make_nurec_env(folder, prim_leaf, env_spacing=500):
+    """Build the shared :class:`EnvSceneAssetCfg` for a NuRec Real2Sim scene.
+
+    Args:
+        folder: Asset sub-folder under ``usd/`` (also the ``--environment`` alias).
+        prim_leaf: Prim-path leaf (a valid USD identifier, no hyphens).
+        env_spacing: Per-env spacing [m]; large for the sizeable Real2Sim scenes.
+    """
+    usd_dir = os.path.join(os.path.dirname(__file__), "../usd", folder)
+    return EnvSceneAssetCfg(
+        prim_path="{ENV_REGEX_NS}/" + prim_leaf,
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0, 0, 0.01),
+            rot=(0.0, 0.0, 0.0, 1.0),
+        ),
+        spawn=sim_utils.UsdFileCfg(
+            usd_path=os.path.join(usd_dir, NUREC_USD_FILE),
+            scale=(1.0, 1.0, 1.0),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                disable_gravity=None,
+                solver_position_iteration_count=4,
+                solver_velocity_iteration_count=1,
+            ),
+        ),
+        env_spacing=env_spacing,
+    )
+
+
+# Register paths + build cfg objects for every NuRec scene (keyed by alias).
+nurec_envs = {}
+for _folder, _leaf in NUREC_SCENES.items():
+    _usd_dir = os.path.join(os.path.dirname(__file__), "../usd", _folder)
+    USD_PATHS[_leaf] = os.path.join(_usd_dir, NUREC_USD_FILE)
+    OMAP_PATHS[_leaf] = {
+        "path": os.path.join(_usd_dir, NUREC_OMAP_FILE),
+        "origin_convention": NUREC_ORIGIN_CONVENTION,
+    }
+    nurec_envs[_folder] = make_nurec_env(_folder, _leaf)
 
 
 # Adding a USD scene with combined office, galileo lab and warehouse single rack.
@@ -250,3 +326,24 @@ random_envs = EnvSceneAssetCfg(
     ),
     replicate_physics=False,
 )
+
+# NuRec scenes (incl. ``nova_carter-galileo``) are built by the NUREC_SCENES loop
+# above and exposed via the ``nurec_envs`` dict.
+
+# nova_carter_galileo_nurec_1 = EnvSceneAssetCfg(
+#     prim_path="{ENV_REGEX_NS}/NovaCarterGalileo_NuRec_1",
+#     init_state=AssetBaseCfg.InitialStateCfg(
+#         pos=(0, 0, 0.01),
+#         rot=(0.0, 0.0, 0.0, 1.0),
+#     ),
+#     spawn=sim_utils.UsdFileCfg(
+#         usd_path=USD_PATHS['NovaCarterGalileo_NuRec_1'],
+#         scale=(1.0, 1.0, 1.0),
+#         rigid_props=sim_utils.RigidBodyPropertiesCfg(
+#             disable_gravity=None,
+#             solver_position_iteration_count=4,
+#             solver_velocity_iteration_count=1,
+#         ),
+#     ),
+#     env_spacing=500,
+# )

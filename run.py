@@ -80,10 +80,28 @@ parser.add_argument("--video_interval",
                     type=int,
                     default=10,
                     help="Interval between video recordings (in iterations).")
+parser.add_argument("--camera_sensor_name",
+                    type=str,
+                    default="camera",
+                    help="Name of the onboard camera sensor in env.scene.sensors "
+                         "used for robot-camera video recording (default: 'camera').")
 # Optional parameters to override gin config.
 parser.add_argument('--embodiment', type=str, help='Embodiment type')
 parser.add_argument('--environment', type=str, help='Environment type')
 parser.add_argument('--num_envs', type=int, help='Number of environments')
+parser.add_argument('--precompute_valid_poses',
+                    action='store_true',
+                    default=False,
+                    help='Precompute valid pose locations for faster sampling')
+parser.add_argument('--precompute_valid_orientations',
+                    action='store_true',
+                    default=False,
+                    help='Precompute valid orientations for each pose location. '
+                         'If False, uses randomly generated orientations.')
+parser.add_argument('--disable_terrain',
+                    action='store_true',
+                    default=False,
+                    help='Disable terrain (set terrain to None).')
 
 # Multi-GPU training. Pair with `torchrun --nproc_per_node N run.py --distributed ...`;
 # AppLauncher consumes this to bind each rank to its own GPU.
@@ -119,6 +137,7 @@ from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
 from compass.distillation.distillation import ESDistillationPolicyWrapper
 from compass.residual_rl.residual_ppo_trainer import ResidualPPOTrainer
 from compass.utils.logger import Logger
+from compass.utils.multi_camera_video_recorder import MultiCameraVideoRecorder
 
 
 class _NoOpLogger:
@@ -159,8 +178,10 @@ EnvSceneAssetCfgMap = {
     'combined_multi_rack': environments.combined_multi_rack,
     'random_envs': environments.random_envs,
     'hospital': environments.hospital,
-    'warehouse_multi_rack': environments.warehouse_multi_rack
+    'warehouse_multi_rack': environments.warehouse_multi_rack,
 }
+# Register all NuRec Real2Sim scenes (keyed by their ``--environment`` alias).
+EnvSceneAssetCfgMap.update(environments.nurec_envs)
 
 
 def gin_config_to_dictionary(gin_config):
@@ -183,7 +204,12 @@ def run(run_mode,
         num_iterations,
         num_steps_per_iteration,
         seed,
-        enable_curriculum=False):
+        enable_curriculum=False,
+        goal_pose_collision_distance=0.5,
+        start_pose_collision_distance=0.75,
+        precompute_valid_poses=False,
+        precompute_valid_orientations=False,
+        disable_terrain=False):
 
     # Multi-GPU distributed setup. With `--distributed`, AppLauncher (already invoked
     # at module load) reads LOCAL_RANK / RANK / WORLD_SIZE from torchrun's env, sets
@@ -263,6 +289,10 @@ def run(run_mode,
     env_cfg.scene.num_envs = num_envs
     env_cfg.events.reset_base.params["pose_range"] = env_cfg.scene.environment.pose_sample_range
 
+    # Setup terrain (disable if requested)
+    if disable_terrain or args_cli.disable_terrain:
+        env_cfg.scene.terrain = None
+
     # Setup the curriculum
     if enable_curriculum:
         env_cfg.curriculum.command_min_distance_prob.params[
@@ -288,6 +318,14 @@ def run(run_mode,
     if args_cli.distributed:
         env_cfg.sim.device = device
 
+    # Set collision distances and max resample trial from gin config
+    env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+
+    # Set collision distances and max resample trial from gin config
+    env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+
     # Disable rewards, termination and curriculum for eval.
     if run_mode == 'eval' or run_mode == 'record':
         env_cfg.rewards = None
@@ -296,7 +334,21 @@ def run(run_mode,
     # Only rank 0 records video — non-rank-0 ranks would compete for the same files
     # under output_dir/videos/ and produce duplicates.
     record_video = args_cli.video and is_rank_zero
-    env = RLESEnvWrapper(cfg=env_cfg, render_mode="rgb_array" if record_video else None)
+    # Use CLI flag if provided, otherwise use gin config
+    precompute_flag = args_cli.precompute_valid_poses or precompute_valid_poses
+    precompute_orientations_flag = args_cli.precompute_valid_orientations or precompute_valid_orientations
+    env = RLESEnvWrapper(cfg=env_cfg,
+                         render_mode="rgb_array" if record_video else None,
+                         precompute_valid_poses=precompute_flag,
+                         precompute_valid_orientations=precompute_orientations_flag)
+
+    # Precompute valid pose locations if requested
+    if precompute_flag and env.collision_checker.is_initialized():
+        print("Precomputing valid pose locations...")
+        env.collision_checker.precompute_valid_poses(
+            start_collision_distance=start_pose_collision_distance,
+            goal_collision_distance=goal_pose_collision_distance,
+            precompute_valid_orientations=precompute_orientations_flag)
 
     # Setup video if enabled.
     if record_video:
@@ -309,8 +361,13 @@ def run(run_mode,
                 num_steps_per_iteration,
             "disable_logger":
                 True,
+            "camera_sensor_name":
+                args_cli.camera_sensor_name,
         }
-        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+        # MultiCameraVideoRecorder wraps the viewport stream with gymnasium's
+        # RecordVideo internally and additionally records the onboard robot
+        # camera sensor to a separate "robot_camera/" sub-folder.
+        env = MultiCameraVideoRecorder(env, **video_kwargs)
 
     # Setup the agent.
     rl_trainer = ResidualPPOTrainer(env=env,
@@ -359,6 +416,12 @@ def main():
         gin.bind_parameter('run.environment', args_cli.environment)
     if args_cli.num_envs is not None:
         gin.bind_parameter('run.num_envs', args_cli.num_envs)
+    if args_cli.precompute_valid_poses:
+        gin.bind_parameter('run.precompute_valid_poses', True)
+    if args_cli.precompute_valid_orientations:
+        gin.bind_parameter('run.precompute_valid_orientations', True)
+    if args_cli.disable_terrain:
+        gin.bind_parameter('run.disable_terrain', True)
 
     # Run the training/evaluation/recording.
     run()

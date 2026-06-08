@@ -16,6 +16,7 @@
 import isaaclab.sim as sim_utils
 from isaaclab.assets import AssetBaseCfg
 from isaaclab.sensors import CameraCfg, TiledCameraCfg
+from isaaclab.sensors.camera.camera_isp import CameraISPMode
 from isaaclab.terrains import TerrainImporterCfg
 
 # Terrain
@@ -38,6 +39,7 @@ camera = TiledCameraCfg(
     height=320,
     width=512,
     data_types=["rgb", "depth"],
+    isp_cfg=CameraISPMode.AUTO_ANY, # ← enable PPISP (auto-discover baked shader)
     spawn=sim_utils.PinholeCameraCfg(focal_length=10.0,
                                      focus_distance=400.0,
                                      horizontal_aperture=20.955,

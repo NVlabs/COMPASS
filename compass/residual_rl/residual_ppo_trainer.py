@@ -16,10 +16,15 @@
 import os
 import time
 from contextlib import contextmanager
+from datetime import datetime
 
 import numpy as np
 import h5py
 import gin
+# Set matplotlib backend before importing pyplot to avoid GUI backend issues
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for headless environments
+import matplotlib.pyplot as plt
 import torch
 import torch.distributed as dist
 from tqdm import tqdm
@@ -44,7 +49,9 @@ class ResidualPPOTrainer:
                  device='cpu',
                  num_steps_per_env=100,
                  ckpt_save_interval=50,
-                 debug_viz=False):
+                 debug_viz=False,
+                 max_debug_images=2,
+                 debug_image_interval=10):
         # Prepare log directory. exist_ok=True avoids a TOCTOU race when several
         # torchrun ranks check + create concurrently.
         os.makedirs(output_dir, exist_ok=True)
@@ -102,6 +109,20 @@ class ResidualPPOTrainer:
         self.ckpt_save_interval = ckpt_save_interval
         self.current_learning_iteration = 0
         self.debug_viz = debug_viz
+
+        # Init debug images directory and counter. Independent of `debug_viz`
+        # (which controls action-arrow visualization); debug image saving is
+        # gated by `max_debug_images` (None/0 = disabled) and `debug_image_interval`.
+        self.debug_images_dir = os.path.join(output_dir, 'debug_images')
+        if not os.path.exists(self.debug_images_dir):
+            os.makedirs(self.debug_images_dir, exist_ok=True)
+        self.image_counter = 0
+        # Maximum number of grid images to save (None/0 = Skip saving images)
+        # each grid is comprised of 8 images, and so for 64 envs, there would be
+        # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
+        self.max_debug_images = max_debug_images
+        # Save images every `debug_image_interval` iterations
+        self.debug_image_interval = debug_image_interval
 
         self.env.reset()
 
@@ -297,6 +318,9 @@ class ResidualPPOTrainer:
                             times[f"rollout/env_step/{_k}"] = times.get(
                                 f"rollout/env_step/{_k}", 0.0) + _v
 
+                        # Save debug camera grids (self-gated by max_debug_images / interval / step).
+                        self._save_debug_images(obs_dict, it, _)
+
                         # Move time out information to the extras dict
                         # this is only needed for infinite horizon tasks
                         if not self.env.unwrapped.cfg.is_finite_horizon:
@@ -392,6 +416,9 @@ class ResidualPPOTrainer:
                         final_actions = base_actions + residual_actions
 
                     obs_dict, _, _, _, _ = self.env.step(final_actions)
+
+                    # Save debug camera grids (self-gated by max_debug_images / interval / step).
+                    self._save_debug_images(obs_dict, it, step)
 
                     # Update metrics.
                     if 'fall_down' in obs_dict['eval']:
@@ -560,6 +587,219 @@ class ResidualPPOTrainer:
                                   video_path=target_video_path,
                                   fps=16,
                                   step=target_iteration)
+
+    def _save_debug_images(self, obs_dict, iteration, step):
+        """Save debug images from all cameras as multiple grids for 1 step during training."""
+        try:
+            if self.max_debug_images is None or self.max_debug_images == 0:
+                return
+
+            if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
+                return
+
+            # Only save images for the first step to avoid too many files
+            if step != 0:
+                return
+
+            # Only save images at specified iteration intervals
+            if iteration % self.debug_image_interval != 0:
+                return
+
+            camera_rgb = obs_dict["policy"]["camera_rgb_img"]
+            batch_size = camera_rgb.shape[0]
+
+            # Convert tensors to numpy
+            rgb_images_np = camera_rgb.detach().cpu().numpy()
+
+            # Get depth images if available
+            depth_images_np = None
+            if "privileged" in obs_dict and "camera_depth_img" in obs_dict["privileged"]:
+                depth_images = obs_dict["privileged"]["camera_depth_img"]
+                depth_images_np = depth_images.detach().cpu().numpy()
+
+            # Process environments in batches of 8 to create multiple grids
+            envs_per_grid = 8
+            num_grids = (batch_size + envs_per_grid - 1) // envs_per_grid    # Ceiling division
+
+            # Limit the number of grids if max_debug_images is set
+            if self.max_debug_images is not None:
+                num_grids = min(num_grids, self.max_debug_images)
+
+            for grid_idx in range(num_grids):
+                start_env = grid_idx * envs_per_grid
+                end_env = min(start_env + envs_per_grid, batch_size)
+
+                # Prepare images for this grid
+                grid_images = []
+                subtitles = []
+
+                for env_idx in range(start_env, end_env):
+                    # Process RGB image
+                    rgb_img = rgb_images_np[env_idx].copy()  # Make a copy to avoid modifying original
+
+                    # Handle different image shapes - camera images are flattened in observations
+                    if len(rgb_img.shape) == 1:
+                        # Flattened image - reshape to (H, W, C)
+                        height, width = INPUT_IMAGE_SIZE[0], INPUT_IMAGE_SIZE[1]
+                        channels = 3
+                        expected_size = height * width * channels
+                        if rgb_img.size == expected_size:
+                            rgb_img = rgb_img.reshape(height, width, channels)
+                        else:
+                            print(f"[WARNING] Image size mismatch: expected {expected_size}, got {rgb_img.size}")
+                            continue
+                    elif len(rgb_img.shape) == 3:
+                        # Already in (H, W, C) or (C, H, W) format
+                        if rgb_img.shape[0] == 3 or rgb_img.shape[0] == 1:
+                            # Image is in (C, H, W) format - transpose to (H, W, C)
+                            rgb_img = np.transpose(rgb_img, (1, 2, 0))
+                        # Ensure it's (H, W, 3) - if grayscale, convert to RGB
+                        if len(rgb_img.shape) == 2:
+                            # Grayscale - convert to RGB
+                            rgb_img = np.stack([rgb_img] * 3, axis=-1)
+                        elif rgb_img.shape[2] == 1:
+                            rgb_img = np.repeat(rgb_img, 3, axis=2)
+                        elif rgb_img.shape[2] != 3:
+                            print(f"[WARNING] Unexpected image shape: {rgb_img.shape}")
+                            continue
+
+                    # Ensure image is in correct range and type for matplotlib
+                    if rgb_img.dtype != np.uint8:
+                        if rgb_img.max() <= 1.0:
+                            rgb_img = (np.clip(rgb_img, 0, 1) * 255).astype(np.uint8)
+                        else:
+                            rgb_img = np.clip(rgb_img, 0, 255).astype(np.uint8)
+                    else:
+                        # Already uint8, but ensure values are in valid range
+                        rgb_img = np.clip(rgb_img, 0, 255)
+
+                    # Ensure image is contiguous in memory for matplotlib
+                    if not rgb_img.flags['C_CONTIGUOUS']:
+                        rgb_img = np.ascontiguousarray(rgb_img)
+
+                    grid_images.append(rgb_img)
+                    subtitles.append(f"RGB Env {env_idx}")
+
+                    # Process depth image if available
+                    if depth_images_np is not None:
+                        depth_img = depth_images_np[env_idx]
+
+                        # Reshape if flattened
+                        if len(depth_img.shape) == 1:
+                            height, width = INPUT_IMAGE_SIZE[0], INPUT_IMAGE_SIZE[1]
+                            depth_img = depth_img.reshape(height, width)
+
+                        # Normalize depth for visualization (0-255)
+                        # Handle NaN and infinity values
+                        depth_img_clean = np.nan_to_num(depth_img, nan=0.0, posinf=0.0, neginf=0.0)
+                        depth_max = depth_img_clean.max()
+                        depth_min = depth_img_clean.min()
+
+                        if depth_max > depth_min and depth_max > 0:
+                            # Normalize to 0-255 range
+                            depth_img_norm = ((depth_img_clean - depth_min) /
+                                              (depth_max - depth_min) * 255).astype(np.uint8)
+                        else:
+                            depth_img_norm = np.zeros_like(depth_img_clean, dtype=np.uint8)
+
+                        # Convert to 3-channel for consistency
+                        depth_img_3ch = np.stack([depth_img_norm] * 3, axis=-1)
+
+                        grid_images.append(depth_img_3ch)
+                        subtitles.append(f"Depth Env {env_idx}")
+
+                # Create grid layout and log to wandb
+                if len(grid_images) > 0:
+                    grid_image_path = self._create_image_grid(grid_images, subtitles, iteration,
+                                                              step, grid_idx)
+
+                    # Log the image to wandb using the logger with grid index in name
+                    if grid_image_path is not None:
+                        self.logger.log_image(name=f"debug/camera_grid_{grid_idx}",
+                                              image_path=grid_image_path,
+                                              step=iteration)
+
+        except (KeyError, IOError, OSError, ValueError, RuntimeError, AttributeError) as e:
+            print(f"Warning: Failed to save debug images: {e}")
+
+    def _create_image_grid(self, images, subtitles, iteration, step, grid_idx=0):
+        """Create and save a grid of images. Returns the filepath of the saved image."""
+
+        num_images = len(images)
+        if num_images == 0:
+            return None
+
+        # Calculate grid dimensions (prefer wider grids)
+        if num_images <= 4:
+            rows, cols = 1, num_images
+        elif num_images <= 8:
+            rows, cols = 2, 4
+        elif num_images <= 12:
+            rows, cols = 3, 4
+        else:
+            rows, cols = 4, 4
+
+        # Create figure
+        fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+        if rows == 1 and cols == 1:
+            axes = [axes]
+        elif rows == 1 or cols == 1:
+            axes = axes.flatten()
+        else:
+            axes = axes.flatten()
+
+        # Plot images
+        for i, (img, subtitle) in enumerate(zip(images, subtitles)):
+            if i < len(axes):
+                # Ensure image is in correct format for matplotlib
+                # matplotlib.imshow expects (H, W, 3) for RGB or (H, W) for grayscale
+                if len(img.shape) == 3 and img.shape[2] == 3:
+                    # RGB image - ensure it's uint8 in [0, 255] range
+                    if img.dtype != np.uint8:
+                        img = np.clip(img, 0, 255).astype(np.uint8)
+                    axes[i].imshow(img, interpolation='nearest')
+                elif len(img.shape) == 2:
+                    # Grayscale image
+                    if img.dtype != np.uint8:
+                        img = np.clip(img, 0, 255).astype(np.uint8)
+                    axes[i].imshow(img, cmap='gray', interpolation='nearest')
+                else:
+                    # Fallback for other formats
+                    axes[i].imshow(img, interpolation='nearest')
+                axes[i].set_title(subtitle, fontsize=10)
+                axes[i].axis('off')
+
+        # Hide unused subplots
+        for i in range(len(images), len(axes)):
+            axes[i].axis('off')
+
+        # Add overall title
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        fig.suptitle(f"Camera Views Grid {grid_idx} - Iter {iteration:04d} Step {step:04d}",
+                     fontsize=14)
+
+        # Save the grid
+        filename = f"camera_grid_{grid_idx}_iter_{iteration:04d}_step_{step:04d}_{timestamp}.png"
+        filepath = os.path.join(self.debug_images_dir, filename)
+
+        try:
+            plt.tight_layout()
+            # Use PNG format for better compatibility and lossless quality
+            # Set format explicitly and ensure proper saving
+            plt.savefig(filepath, dpi=150, bbox_inches='tight', format='png',
+                       facecolor='white', edgecolor='none', pad_inches=0.1)
+            plt.close()
+
+            # Verify file was created and is readable
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                return filepath
+            else:
+                print(f"[WARNING] Failed to save debug image: {filepath}")
+                return None
+        except Exception as e:    # pylint: disable=broad-except
+            print(f"[ERROR] Exception while saving debug image: {e}")
+            plt.close()
+            return None
 
     def load(self, path, load_optimizer=True):
         # map_location pins both model and optimizer tensors directly onto this

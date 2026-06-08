@@ -131,6 +131,7 @@ extending
 :hidden:
 
 workflows/training
+workflows/nurec_real2sim
 workflows/recording
 workflows/distillation
 workflows/export
