@@ -250,6 +250,41 @@ Reduce `--num_envs` on OOM, or lower the camera resolution in `scene_assets.came
 - **Precompute orientations** — `precompute_valid_orientations = True` or `--precompute_valid_orientations` (slower; for very tight spaces).
 - **Iterations / envs** — `num_iterations` in the config, `--num_envs` on the CLI.
 
+### Multi-GPU (distributed) training
+
+Add `--distributed` and launch `run.py` under `torch.distributed.run` to fan out
+across GPUs. Each rank runs its own Isaac Sim instance; gradients/metrics sync via
+all-reduce, and rank 0 owns the logger, checkpoints, and video. No NuRec-specific
+flags change — your scene/precompute args stay the same.
+
+```bash
+${ISAACLAB_PATH:?}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node=<N> \
+    run.py --distributed \
+    -c configs/train_config_real2sim.gin \
+    -o <output_dir> -b <path/to/x_mobility_ckpt> \
+    --embodiment carter --environment nova_carter-galileo \
+    --num_envs <per-GPU> \
+    --enable_cameras --precompute_valid_poses \
+    --video --video_interval 1
+```
+
+```{warning}
+`--num_envs` is the count **per GPU** (total = `nproc_per_node × num_envs`). NuRec
+scenes are VRAM-heavy — roughly `VRAM ≈ 9 GB + 1.3 GB × num_envs` per GPU — so the
+real2sim config's default `num_envs=64` will **OOM a single GPU**. Set a per-GPU-safe
+value: ~24 on an RTX A6000 / L40 (48 GB), ~14 on an RTX 5090 (32 GB).
+```
+
+Notes:
+
+- **Run headless** for multi-GPU — omit `--visualizer kit` (you don't want one
+  viewport per rank). `--enable_cameras` still drives the RTX renderer for the NuRec
+  Gaussian camera sensors, and video / debug images are recorded on **rank 0 only**.
+- `--precompute_valid_poses` works as-is; each rank precomputes its own scene's poses.
+- `--nproc_per_node=1` (or plain `run.py --distributed`) is a valid single-rank fallback.
+- On the cluster, `osmo/run_osmo.py train --num-gpus {2,8}` routes to the matching
+  multi-GPU workflow.
+
 ## Evaluating the trained policy
 
 ```bash
