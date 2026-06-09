@@ -36,9 +36,10 @@ cd compass-nurec
 ### Terminal 1 — Isaac Lab & Isaac Sim
 
 ```bash
-# 1. Clone Isaac Lab (latest release branch)
+# 1. Clone Isaac Lab and check out the release branch
 git clone https://github.com/isaac-sim/IsaacLab.git
 cd IsaacLab
+git checkout release/3.0.0-beta2
 
 # 2. Create + activate a conda environment (Python 3.12)
 ./isaaclab.sh --conda env_isaaclab_3.0_compass
@@ -117,6 +118,22 @@ mv groot_mobility_rl_es_usds/usd compass/rl_env/exts/mobility_es/mobility_es/
 ```bash
 hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec
 ```
+
+````{note}
+The dataset is a git repo, so you can pin a specific version with `--revision <tag | branch | commit>`
+(defaults to `main`). Pinning matters because the **flat** layout used here
+(`particle_ppispon_spg.usdz` + scene-root `occupancy_map.yaml`) may only be on a specific
+revision. For example:
+
+```bash
+hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
+    --revision v0.1 \
+    --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec \
+    --include "nova_carter-galileo/**"
+```
+
+Use a tag (e.g. `v0.1`) for a stable, reproducible pull; a branch tracks the latest on that branch.
+````
 
 ````{tip}
 The full dataset is large. Use `--include` / `--exclude` glob filters to pull only
@@ -212,7 +229,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     -b <path/to/x_mobility_ckpt> \
     --embodiment <embodiment_type> \
     --environment nova_carter-galileo \
-    --num_envs 64 \
+    --num_envs 12 \
     --video \
     --video_interval 1 \
     --visualizer kit \
@@ -224,24 +241,65 @@ Where:
 
 - `<embodiment_type>` — one of `h1`, `spot`, `carter`, `g1`, `digit`.
 - `--environment` — any registered NuRec scene (see the table above).
-- Checkpoints land in `<output_dir>/checkpoints/model_<iter>.pt`; videos in `<output_dir>/videos/`.
+- `--num_envs 12` is a conservative default that fits the smallest supported GPU with the
+  default **particle** assets. **Raise it per the VRAM table below** (≈18 on a 32 GB card,
+  ≈32 on a 48 GB A6000 / L40). Don't copy a large value blindly — NuRec scenes are memory-heavy,
+  and the **volume** asset variant costs far more per env.
+- Checkpoints are written directly to `<output_dir>/model_<iter>.pt` — every `ckpt_save_interval`
+  iterations (default **50**: `model_0.pt`, `model_50.pt`, …), plus a final one at the end.
+  Videos land in `<output_dir>/videos/`. (There is **no** `checkpoints/` subfolder.)
 
 ```{note}
 To run headless, omit `--visualizer kit` (or pass `--visualizer None`).
 ```
 
 ```{note}
-GPU memory scales ~linearly with `--num_envs`; NuRec scenes cost roughly **2×**
-the default COMPASS scene (heavier USDs). Empirical fit on an RTX A6000
-(Carter + `nova_carter-galileo`): `VRAM ≈ 9 GB + 1.3 GB × num_envs`.
+**GPU memory (approximate).** Per-env VRAM scales roughly linearly. The numbers below are a
+**single-run** measurement and are rough guides only — your peak will vary with camera resolution,
+embodiment, scene, driver version, and other GPU load. Measurement setup:
 
-| GPU | VRAM | Safe `--num_envs` (NuRec) |
+- **GPU:** RTX A6000 (48 GB), single **dedicated, headless** GPU (no viewport)
+- **Run:** `--embodiment carter`, `--environment nova_carter-galileo`, camera 320×512, `--precompute_valid_poses`
+- **Value:** peak GPU memory during training, over a ~120 MiB idle baseline
+
+| num_envs | particle (`particle_ppispon_spg.usdz`) | volume (`volume_ppispon_spg.usdz`) |
 |---|---|---|
-| RTX 5090 | 32 GB | ~14 |
-| RTX A6000 / L40 | 48 GB | ~24 |
+| 1  | 9.4 GiB  | 9.0 GiB  |
+| 5  | 13.3 GiB | 15.9 GiB |
+| 10 | 18.1 GiB | 24.7 GiB |
+| 15 | 22.7 GiB | 33.0 GiB |
 
-Reduce `--num_envs` on OOM, or lower the camera resolution in `scene_assets.camera`.
+Linear fits:
+- **particle** (default) — `VRAM ≈ 8.5 GB + 1.0 GB × num_envs`
+- **volume** — `VRAM ≈ 7 GB + 1.75 GB × num_envs` (lower fixed cost, but ~1.8× the per-env cost)
+
+Safe `--num_envs` (peak ≤ ~85 % of GPU, headless / dedicated GPU):
+
+| GPU | VRAM | particle | volume |
+|---|---|---|---|
+| RTX 5090 | 32 GB | ~18 | ~10 |
+| RTX A6000 / L40 | 48 GB | ~32 | ~18 |
+
+Subtract a couple of envs if the GPU also drives your display. Reduce `--num_envs` on OOM,
+or lower the camera resolution in `scene_assets.camera`.
 ```
+
+````{note}
+**Particle vs volume assets.** Every bundled NuRec scene ships two Gaussian variants —
+`particle_ppispon_spg.usdz` (default) and `volume_ppispon_spg.usdz` — rendering the same scene.
+**Particle is recommended for training**: ~1.0 GB/env vs volume's ~1.75 GB/env (they only tie at
+a single env, so volume loses badly as you scale).
+
+To switch to the volume variant, change the `NUREC_USD_FILE` constant in
+`mobility_es/config/environments.py`:
+
+```python
+NUREC_USD_FILE = "volume_ppispon_spg.usdz"   # default: "particle_ppispon_spg.usdz"
+```
+
+This is a **global** switch — it applies to all registered NuRec scenes, which is fine since
+each one ships both files. (The occupancy map is unchanged; only the rendered Gaussian asset differs.)
+````
 
 ### Advanced training options
 
@@ -270,9 +328,10 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node=<N> 
 
 ```{warning}
 `--num_envs` is the count **per GPU** (total = `nproc_per_node × num_envs`). NuRec
-scenes are VRAM-heavy — roughly `VRAM ≈ 9 GB + 1.3 GB × num_envs` per GPU — so the
-real2sim config's default `num_envs=64` will **OOM a single GPU**. Set a per-GPU-safe
-value: ~24 on an RTX A6000 / L40 (48 GB), ~14 on an RTX 5090 (32 GB).
+scenes are VRAM-heavy (`VRAM ≈ 8.5 GB + 1.0 GB × num_envs` per GPU for the default particle
+assets), so the real2sim config's default `num_envs=64` will **OOM a single GPU**. Set a
+per-GPU-safe value from the VRAM table above (~32 on a 48 GB A6000 / L40, ~18 on a 32 GB
+RTX 5090 with particle; roughly half those with the volume variant).
 ```
 
 Notes:
@@ -302,7 +361,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     --visualizer kit
 ```
 
-`<path/to/residual_policy_ckpt>` is e.g. `<output_dir>/checkpoints/model_1000.pt`.
+`<path/to/residual_policy_ckpt>` is e.g. `<output_dir>/model_1000.pt`.
 
 ## Model export
 
@@ -343,4 +402,9 @@ For sim-to-real:
 **Isaac Sim fails to launch** (`Failed create an extension after pull: omni.grpc.lib`) — the
 `extscache` extra is missing; reinstall with `isaacsim[all,extscache]==<version>`.
 
-**High GPU memory** — reduce `--num_envs` (start with 32–64), or lower camera resolution.
+**High GPU memory / CUDA OOM** — `--num_envs` is the main lever, and NuRec scenes are
+memory-heavy (particle: `VRAM ≈ 8.5 GB + 1.0 GB × num_envs`; volume: ~`7 + 1.75 × num_envs`).
+Pick a value from the [VRAM table above](#training-the-policy) for your GPU + asset format
+(particle: ~18 on a 32 GB card, ~32 on a 48 GB A6000 / L40; ~half that for volume) rather than
+a fixed default, and lower it further if you still OOM. With `--distributed`, remember `--num_envs`
+is **per GPU**.
