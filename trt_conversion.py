@@ -33,10 +33,14 @@ import tensorrt as trt
 
 
 def convert(onnx_path, trt_path):
-    # Create a TensorRT builder and network with explicit batch flag
-    explicit_batch = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    # Create a TensorRT builder and network.
+    # TensorRT >= 10 removed the EXPLICIT_BATCH flag (explicit batch is the only
+    # mode now); pass it only on older builds for backward compatibility.
     builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
-    network = builder.create_network(explicit_batch)
+    network_flags = 0
+    if hasattr(trt.NetworkDefinitionCreationFlag, "EXPLICIT_BATCH"):
+        network_flags = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    network = builder.create_network(network_flags)
 
     # Parse the ONNX model
     parser = trt.OnnxParser(network, trt.Logger(trt.Logger.WARNING))
@@ -51,6 +55,8 @@ def convert(onnx_path, trt_path):
 
     # Build TensorRT engine
     engine = builder.build_serialized_network(network, builder_config)
+    if engine is None:
+        raise RuntimeError("TensorRT engine build failed (see the TensorRT log output above).")
 
     # Save the serialized TensorRT engine
     with open(trt_path, 'wb') as f:
