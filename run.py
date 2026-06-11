@@ -301,11 +301,35 @@ def run(run_mode,
     else:
         env_cfg.curriculum = None
 
-    # Setup viewer
+    # Setup viewer.
+    # ViewerCfg drives the RTX/Kit viewport camera (via ViewportCameraController), which
+    # follows the robot ('asset_root'). It does NOT apply to the Newton visualizer — that
+    # path is gated on Kit being present, so a `--visualizer newton` viewport is blank
+    # unless we give it a camera through sim.visualizer_cfgs (see below).
     env_cfg.viewer.origin_type = 'asset_root'
     env_cfg.viewer.asset_name = 'robot'
     env_cfg.viewer.env_index = 0
     env_cfg.viewer.eye = (-2.5, -0.5, 1.5)
+
+    # Newton visualizer camera (new Visualizers API). Newton reads its camera from
+    # sim.visualizer_cfgs, not ViewerCfg, so without this its viewport is empty. Give it a
+    # robot-following camera (tiled-cam follow is Newton's follow mechanism). Only added when
+    # '--visualizer newton' is requested; if 'kit' is also requested the simulator auto-fills
+    # the Kit default, so the RTX viewport is unaffected.
+    _requested_viz = getattr(args_cli, 'visualizer', None) or []
+    if isinstance(_requested_viz, str):
+        _requested_viz = _requested_viz.split(',')
+    _requested_viz = [v.strip().lower() for v in _requested_viz]
+    if 'newton' in _requested_viz:
+        from isaaclab_visualizers.newton import NewtonVisualizerCfg
+        newton_viz_cfg = NewtonVisualizerCfg()
+        newton_viz_cfg.eye = (-2.5, -0.5, 1.5)      # initial interactive framing
+        newton_viz_cfg.lookat = (0.0, 0.0, 0.0)
+        newton_viz_cfg.tiled_cam_view = True        # follow-cam panel (Newton's follow path)
+        newton_viz_cfg.tiled_cam_num = 1
+        newton_viz_cfg.tiled_cam_target_prim_path = "/World/envs/*/Robot"
+        newton_viz_cfg.tiled_cam_eye = (-2.5, -0.5, 1.5)
+        env_cfg.sim.visualizer_cfgs = [newton_viz_cfg]
 
     # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
     # rollouts collected by each rank explore different states (matches Isaac Lab's
