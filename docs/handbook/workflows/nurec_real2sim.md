@@ -72,7 +72,7 @@ conda activate env_isaaclab_3.0_compass
 git clone https://github.com/NVlabs/COMPASS.git
 cd COMPASS
 git fetch
-git checkout samc/support_nurec_assets_isaaclab_3.0
+git checkout real2sim/isaaclab_3.0
 
 # Point at your Isaac Lab install
 export ISAACLAB_PATH=</path/to/IsaacLab>
