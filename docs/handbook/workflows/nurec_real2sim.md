@@ -115,24 +115,31 @@ mv groot_mobility_rl_es_usds/usd compass/rl_env/exts/mobility_es/mobility_es/
 
 ### 3. NuRec Real2Sim assets
 
+Download **directly into the `mobility_es` extension's `usd/` folder** — the dataset's scene folders
+sit at the repo root, so they land as `usd/<scene>/...` exactly where the registry expects them, with
+no move step afterwards. Run from the COMPASS root:
+
 ```bash
-hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec
+hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
+    --local-dir compass/rl_env/exts/mobility_es/mobility_es/usd \
+    --include "nova_carter-galileo/**" \
+    --exclude "**/raw_images.zip"
 ```
 
 ````{note}
 The dataset is a git repo, so you can pin a specific version with `--revision <tag | branch | commit>`
-(defaults to `main`). Pinning matters because the **flat** layout used here
-(`particle_ppispon_spg.usdz` + scene-root `occupancy_map.yaml`) may only be on a specific
-revision. For example:
+(defaults to `main`).
+For example:
 
 ```bash
 hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
-    --revision v0.1 \
-    --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec \
-    --include "nova_carter-galileo/**"
+    --revision pr/32 \
+    --local-dir compass/rl_env/exts/mobility_es/mobility_es/usd \
+    --include "nova_carter-galileo/**" \
+    --exclude "**/raw_images.zip"
 ```
 
-Use a tag (e.g. `v0.1`) for a stable, reproducible pull; a branch tracks the latest on that branch.
+Use tag `pr/32` for a stable, reproducible pull; a branch tracks the latest on that branch.
 ````
 
 ````{tip}
@@ -142,13 +149,17 @@ what you need (quote the patterns so the shell doesn't expand them):
 ```bash
 # A single environment
 hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
-    --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec \
-    --include "nova_carter-galileo/**"
+    --revision pr/32 \
+    --local-dir compass/rl_env/exts/mobility_es/mobility_es/usd \
+    --include "nova_carter-galileo/**" \
+    --exclude "**/raw_images.zip"
 
 # Multiple environments
 hf download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
-    --local-dir <compass-nurec>/PhysicalAI-Robotics-NuRec \
-    --include "nova_carter-galileo/**" "nova_carter-cafe/**"
+    --revision pr/32 \
+    --local-dir compass/rl_env/exts/mobility_es/mobility_es/usd \
+    --include "nova_carter-galileo/**" "nova_carter-cafe/**" \
+    --exclude "**/raw_images.zip"
 ```
 ````
 
@@ -162,34 +173,29 @@ Each NuRec scene ships a **flat** layout. For example, `nova_carter-galileo/`:
 
 ```text
 nova_carter-galileo/
-├── particle_ppispon_spg.usdz   # Gaussian scene (SPG variant, PPISP baked in) — loaded by the env
-├── particle_ppispon_sh.usdz    # spherical-harmonics variant (alternative)
-├── volume_ppispon_spg.usdz     # volumetric variant (alternative)
-├── occupancy_map.yaml          # ROS / bottom-left origin convention
+├── stage_particle_spg.usdz   # Gaussian scene (SPG variant, PPISP baked in) — loaded by the env
+├── stage_particle.usdz       # spherical-harmonics variant (alternative)
+├── stage_volume.usdz         # volumetric variant (alternative)
+├── occupancy_map.yaml        # ROS / bottom-left origin convention
 ├── occupancy_map.png
-├── training_trajectory.png
-├── training_trajectory_poses.tum
-└── raw_images.zip
 ```
 
-Move (or symlink) the scene folder into the extension's `usd/` directory:
+Because the download above used `--local-dir .../mobility_es/usd`, each scene already lives at
+`compass/rl_env/exts/mobility_es/mobility_es/usd/<scene>/` — **no move/symlink step needed**. (If you
+downloaded to a different location, `mv` or symlink the scene folder into that `usd/` directory.)
 
-```bash
-# From the COMPASS root
-mv <compass-nurec>/PhysicalAI-Robotics-NuRec/nova_carter-galileo \
-   compass/rl_env/exts/mobility_es/mobility_es/usd/
-```
-
-Scenes are registered in `mobility_es/config/environments.py` via the `NUREC_SCENES`
-table — adding a new scene is **one line** (`"<folder>": "<PrimLeaf>"`). The loader
+Scenes are registered in `mobility_es/config/nurec_scenes.py` via the `NUREC_SCENES`
+table — adding a new scene is **one line** (`NurecScene("<folder>", "<PrimLeaf>")`, with optional
+`usd_file=` / `omap_file=` / `origin_convention=` / `env_spacing=` overrides). The module
 auto-wires `USD_PATHS`/`OMAP_PATHS`, builds the env cfg, and `run.py` exposes it as
 `--environment <folder>`.
 
 ```{note}
-The env loads `particle_ppispon_spg.usdz` and the scene-root `occupancy_map.yaml`,
+The env loads `stage_particle_spg.usdz` and the scene-root `occupancy_map.yaml`,
 which uses a ROS **bottom-left** origin convention. The registry sets this
-automatically (`NUREC_ORIGIN_CONVENTION = "bottom-left"`). Using the wrong
-convention flips the map's Y axis and the robot spawns offset by ~the map height.
+automatically (`DEFAULT_ORIGIN_CONVENTION = "bottom-left"` in `mobility_es/config/nurec_scenes.py`,
+overridable per scene via `NurecScene.origin_convention`). Using the wrong
+convention lead to robot spawning at wrong location.
 ```
 
 Scenes registered out of the box (select with `--environment`):
@@ -262,7 +268,7 @@ embodiment, scene, driver version, and other GPU load. Measurement setup:
 - **Run:** `--embodiment carter`, `--environment nova_carter-galileo`, camera 320×512, `--precompute_valid_poses`
 - **Value:** peak GPU memory during training, over a ~120 MiB idle baseline
 
-| num_envs | particle (`particle_ppispon_spg.usdz`) | volume (`volume_ppispon_spg.usdz`) |
+| num_envs | particle (`stage_particle_spg.usdz`) | volume (`stage_volume.usdz`) |
 |---|---|---|
 | 1  | 9.4 GiB  | 9.0 GiB  |
 | 5  | 13.3 GiB | 15.9 GiB |
@@ -286,18 +292,21 @@ or lower the camera resolution in `scene_assets.camera`.
 
 ````{note}
 **Particle vs volume assets.** Every bundled NuRec scene ships two Gaussian variants —
-`particle_ppispon_spg.usdz` (default) and `volume_ppispon_spg.usdz` — rendering the same scene.
+`stage_particle_spg.usdz` (default) and `stage_volume.usdz` — rendering the same scene.
 **Particle is recommended for training**: ~1.0 GB/env vs volume's ~1.75 GB/env (they only tie at
 a single env, so volume loses badly as you scale).
 
-To switch to the volume variant, change the `NUREC_USD_FILE` constant in
-`mobility_es/config/environments.py`:
+To switch **all** scenes to the volume variant, change the `DEFAULT_USD_FILE` constant in
+`mobility_es/config/nurec_scenes.py`:
 
 ```python
-NUREC_USD_FILE = "volume_ppispon_spg.usdz"   # default: "particle_ppispon_spg.usdz"
+DEFAULT_USD_FILE = "stage_particle_spg.usdz"
 ```
 
-This is a **global** switch — it applies to all registered NuRec scenes, which is fine since
+Or switch a **single** scene by setting its `usd_file` on the `NurecScene` entry, e.g.
+`NurecScene("nova_carter-galileo", "NovaCarterGalileo_NuRec", usd_file="stage_volume.usdz")`.
+
+The `DEFAULT_USD_FILE` change is a **global** switch — it applies to all registered NuRec scenes, which is fine since
 each one ships both files. (The occupancy map is unchanged; only the rendered Gaussian asset differs.)
 ````
 
