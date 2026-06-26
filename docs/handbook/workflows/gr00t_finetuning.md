@@ -29,22 +29,32 @@ Follow the post-training instructions in the
 A ready-to-use navigation data configuration lives on this branch:
 [`liuw/nav_fine_tune`](https://github.com/NVIDIA/Isaac-GR00T/compare/main...liuw/nav_fine_tune).
 
-## Step 3 — Evaluate the post-trained GR00T model in COMPASS
+## Step 3 — Evaluate the post-trained GR00T model in COMPASS (closed loop)
 
-Launch the GR00T inference server (see the Isaac-GR00T repo) on
-**port 8888**, with the same data configuration you used during training.
-Then evaluate from COMPASS:
+> Requires the [`liuw/gr00t-n16-eval`](https://github.com/NVlabs/COMPASS/tree/liuw/gr00t-n16-eval)
+> branch (GR00T N1.6 inference-protocol + 480×640 camera fixes) — `git checkout` it first.
+
+Eval runs two processes over ZeroMQ **port 8888**: the GR00T inference server
+(serves the fine-tuned policy) and the COMPASS sim (queries it each step).
+
+**1. Serve the checkpoint** (in the Isaac-GR00T repo):
 
 ```bash
-python run.py \
-    -c configs/eval_config.gin \
-    -o <output_dir> \
-    -b <path/to/x_mobility_ckpt> \
-    --enable_cameras \
-    --gr00t-policy
+python gr00t/eval/run_gr00t_server.py \
+    --model-path <path/to/checkpoint> \
+    --embodiment-tag NEW_EMBODIMENT \
+    --device cuda:0 --host 0.0.0.0 --port 8888
 ```
 
-`--gr00t-policy` tells `run.py` to dispatch action queries to the inference
-server instead of loading a local checkpoint. Eval parameters (scene,
-embodiment, episode count) live in
-[`configs/eval_config.gin`](https://github.com/NVlabs/COMPASS/blob/main/configs/eval_config.gin).
+**2. Run the closed-loop eval** (in COMPASS):
+
+```bash
+python run.py -c configs/eval_config.gin --enable_cameras --gr00t-policy \
+    -b ./assets/x_mobility.ckpt -o /tmp/gr00t_eval \
+    --embodiment g1 --environment combined_single_rack --num_envs 10
+```
+
+`--gr00t-policy` queries the server at `0.0.0.0:8888` instead of loading a local
+checkpoint (no `-p` needed); the success rate is reported as
+`eval/goal_reached_rate`. Add `--viz kit --num_envs 1` to watch one robot in the
+viewer.
