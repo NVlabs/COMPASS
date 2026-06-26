@@ -128,21 +128,26 @@ class ResidualPPOTrainer:
         device = obs_dict['policy']['camera_rgb_img'].device
         rgb = obs_dict['policy']['camera_rgb_img'].reshape(b, 1, INPUT_IMAGE_SIZE[0],
                                                            INPUT_IMAGE_SIZE[1], 3).cpu().numpy()
+        # GR00T's Gr00tPolicy expects observations nested by modality (video/state/language),
+        # not flat dotted keys.
         observations = {
-            "annotation.human.action.task_description":
-                np.repeat(np.array([["Robot navigation task"]]), b, axis=0),
-            "video.ego_view":
-                rgb,
-            "state.speed":
-                obs_dict['policy']['base_speed'].reshape(b, 1, 1).cpu().numpy(),
-            "state.route":
-                obs_dict['policy']['route'].reshape(b, 1, 40).cpu().numpy(),
-            "state.goal_heading":
-                obs_dict['policy']['goal_heading'].reshape(b, 1, 2).cpu().numpy(),
+            "language": {
+                "annotation.human.action.task_description":
+                    np.repeat(np.array([["Robot navigation task"]]), b, axis=0).tolist(),
+            },
+            "video": {
+                "ego_view": rgb,
+            },
+            "state": {
+                "speed": obs_dict['policy']['base_speed'].reshape(b, 1, 1).cpu().numpy(),
+                "route": obs_dict['policy']['route'].reshape(b, 1, 40).cpu().numpy(),
+                "goal_heading": obs_dict['policy']['goal_heading'].reshape(b, 1, 2).cpu().numpy(),
+            },
         }
+        # get_action returns (action_dict, info_dict); keys are unprefixed. Take first horizon step.
         outputs = self.gr00t_client.get_action(observations)
-        action_tensor = torch.from_numpy(outputs['action.vel_cmd'][:, 0]).to(device=device,
-                                                                             dtype=torch.float32)
+        action_tensor = torch.from_numpy(outputs[0]['vel_cmd'][:, 0]).to(device=device,
+                                                                         dtype=torch.float32)
         # Create zero tensor
         new_tensor = torch.zeros(b, 6, device=action_tensor.device, dtype=action_tensor.dtype)
         # Fill in the specific indices

@@ -13,4 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INPUT_IMAGE_SIZE = (320, 512)
+INPUT_IMAGE_SIZE = (480, 640)

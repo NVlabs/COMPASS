@@ -33,15 +33,20 @@ light = AssetBaseCfg(
 
 # Camera
 camera = TiledCameraCfg(
-    prim_path="{ENV_REGEX_NS}/Robot/chassis_link/front_cam",
+    prim_path="{ENV_REGEX_NS}/Robot/torso_link/front_cam",
     update_period=0.0,
-    height=320,
-    width=512,
+    height=480,
+    width=640,
     data_types=["rgb", "depth"],
-    spawn=sim_utils.PinholeCameraCfg(focal_length=10.0,
-                                     focus_distance=400.0,
-                                     horizontal_aperture=20.955,
-                                     clipping_range=(0.1, 20.0)),
+    spawn=sim_utils.PinholeCameraCfg.from_intrinsic_matrix(intrinsic_matrix=[
+        375.1500244140625, 0.0, 317.8176574707031, 0.0, 374.9283142089844, 248.43441772460938, 0.0,
+        0.0, 1.0
+    ],
+                                                           width=640,
+                                                           height=480,
+                                                           focal_length=24,
+                                                           focus_distance=400.0,
+                                                           clipping_range=(0.1, 20.0)),
     offset=CameraCfg.OffsetCfg(pos=(0.10434, 0.0, 0.37439),
                                rot=(-0.5, 0.5, -0.5, 0.5),
                                convention="ros"),

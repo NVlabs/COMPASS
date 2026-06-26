@@ -51,6 +51,8 @@ def goal_reached(
     # Check if the robot's heading is close to the goal heading and has low velocity
     goal_heading = env.command_manager.get_command(command_name)[:, 3].abs()
     reached_goal = torch.logical_and(goal_heading < heading_threshold, pose_vel_threshold)
+    # GN1.6 point-goal navigation: success on position + velocity only (heading-agnostic).
+    reached_goal = pose_vel_threshold
 
     return reached_goal
 

@@ -228,4 +228,5 @@ class ExternalRobotInferenceClient(BaseInferenceClient):
         The exact definition of the observations is defined
         by the policy, which contains the modalities configuration.
         """
-        return self.call_endpoint("get_action", observations)
+        response = self.call_endpoint("get_action", {"observation": observations, "options": {}})
+        return tuple(response)

@@ -49,8 +49,11 @@ class G1GoalReachingEnvCfg(GoalReachingEnvCfg):
         self.scene.robot = robots.g1.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.camera = scene_assets.camera.replace(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link/front_cam")
+        # GN1.6-tuned ego-camera orientation. gn_16 (Isaac Lab 2.x) used the w-first
+        # quaternion (w, x, y, z) = (-0.29, 0.64, -0.64, 0.29); Isaac Lab 3.0 OffsetCfg.rot
+        # is (x, y, z, w) — w LAST — so the same rotation is (0.64, -0.64, 0.29, -0.29).
         self.scene.camera.offset = CameraCfg.OffsetCfg(pos=(0.1, 0.0, 0.45),
-                                                       rot=(0.6532, -0.6532, 0.2705981, -0.2705),
+                                                       rot=(0.64, -0.64, 0.29, -0.29),
                                                        convention="ros")
 
         self.actions = G1ActionsCfg()
