@@ -112,6 +112,7 @@ parser.add_argument('--distributed',
 
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
+parser.add_argument('--enable_cameras', action='store_true', default=False, help=argparse.SUPPRESS)
 
 # Parse the arguments
 args_cli = parser.parse_args()

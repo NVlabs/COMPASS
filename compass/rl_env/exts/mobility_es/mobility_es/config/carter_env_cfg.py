@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from isaaclab.envs import mdp
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import EventTermCfg as EventTerm
