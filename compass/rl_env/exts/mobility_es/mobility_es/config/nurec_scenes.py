@@ -40,7 +40,7 @@ from mobility_es.config.environments import EnvSceneAssetCfg, OMAP_PATHS, USD_PA
 _USD_DIR = os.path.join(os.path.dirname(__file__), "../usd")
 
 # Defaults shared by all scenes; override per-scene via NurecScene fields.
-DEFAULT_USD_FILE = "stage_particle_spg.usdz"
+DEFAULT_USD_FILE = "particle_spg-runtime.usdz"
 DEFAULT_OMAP_FILE = "occupancy_map.yaml"
 DEFAULT_ORIGIN_CONVENTION = "bottom-left"
 DEFAULT_ENV_SPACING = 500.0

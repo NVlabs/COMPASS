@@ -210,6 +210,16 @@ Scenes registered out of the box (select with `--environment`):
 | `hand_hold-endeavor-wormhole-table` | Conference room (with table), Endeavor |
 | `hand_hold-voyager-babyboom` | Conference room, Voyager building |
 
+### Gaussian render quality
+
+NuRec/SPG scenes use RTX Gaussian rendering, whose camera history affects the
+RGB and depth observations used during training. If first-step or reset images
+look noisy, increase `num_rerenders_on_reset` in the environment config; this
+adds render-only warmup after explicit reset and same-step autoreset before
+observations are returned. If normal rollout images show speckle or edge
+artifacts, lower `sim.render_interval` so each `env.step()` receives more render
+updates.
+
 ### Test the setup
 
 ```bash

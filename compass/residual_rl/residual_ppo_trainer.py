@@ -121,7 +121,7 @@ class ResidualPPOTrainer:
         # each grid is comprised of 8 images, and so for 64 envs, there would be
         # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
         self.max_debug_images = max_debug_images
-        # Save images every `debug_image_interval` iterations
+        # Save images every `debug_image_interval` rollout steps.
         self.debug_image_interval = debug_image_interval
 
         self.env.reset()
@@ -589,7 +589,7 @@ class ResidualPPOTrainer:
                                   step=target_iteration)
 
     def _save_debug_images(self, obs_dict, iteration, step):
-        """Save debug images from all cameras as multiple grids for 1 step during training."""
+        """Save debug images from all cameras as multiple grids during training."""
         try:
             if self.max_debug_images is None or self.max_debug_images == 0:
                 return
@@ -597,12 +597,7 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            # Only save images for the first step to avoid too many files
-            if step != 0:
-                return
-
-            # Only save images at specified iteration intervals
-            if iteration % self.debug_image_interval != 0:
+            if self.debug_image_interval <= 0 or step % self.debug_image_interval != 0:
                 return
 
             camera_rgb = obs_dict["policy"]["camera_rgb_img"]

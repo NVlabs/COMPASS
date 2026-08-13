@@ -314,7 +314,7 @@ class GoalReachingEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 20
         self.episode_length_s = EPISODE_LENGTH_S
-        self.num_rerenders_on_reset = 1
+        self.num_rerenders_on_reset = 5
         # simulation settings
         self.sim.dt = 0.005
         self.sim.physics = PhysxCfg(bounce_threshold_velocity=0.2)
@@ -322,7 +322,7 @@ class GoalReachingEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
         self.sim.physics_material.restitution = 0.0
-        self.sim.render_interval = self.decimation
+        self.sim.render_interval = 5
         # Update sensor update.
         if self.scene.contact_forces is not None:
             self.scene.contact_forces.update_period = self.sim.dt
