@@ -55,6 +55,7 @@ and per-subcommand examples.
 
 import argparse
 import getpass
+import netrc
 import os
 import shlex
 import subprocess
@@ -71,6 +72,11 @@ SUBCOMMAND_CONFIG = {
     "eval": ("rl_es_eval_workflow.yaml", "docker/Dockerfile.rl"),
     "record": ("rl_es_record_workflow.yaml", "docker/Dockerfile.rl"),
     "distill": ("distillation_train_workflow.yaml", "docker/Dockerfile.distillation"),
+}
+SENSITIVE_SET_ARGS = {"wandb_api_key", "hf_token"}
+NETRC_MACHINES = {
+    "WANDB_API_KEY": ("api.wandb.ai",),
+    "HF_TOKEN": ("huggingface.co", "hf.co"),
 }
 
 
@@ -113,6 +119,10 @@ def parse_args():
                        help="Skip the residual head (use base policy only).")
     train.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     train.add_argument("--environment", default="", help="Override the gin-config environment.")
+    train.add_argument("--num-envs",
+                       type=int,
+                       default=32,
+                       help="Number of Isaac Lab envs per GPU.")
     train.add_argument("--num-gpus",
                        type=int,
                        default=8,
@@ -136,6 +146,10 @@ def parse_args():
                      help="Evaluate without the residual head (base policy only).")
     evl.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     evl.add_argument("--environment", default="", help="Override the gin-config environment.")
+    evl.add_argument("--num-envs",
+                     type=int,
+                     default=32,
+                     help="Number of Isaac Lab envs for evaluation.")
 
     rec = sub.add_parser("record", help="Submit distillation-data recording.")
     add_common(rec)
@@ -161,13 +175,46 @@ def parse_args():
     return parser.parse_args()
 
 
+def get_netrc_credential(name: str) -> str:
+    machines = NETRC_MACHINES.get(name, ())
+    if not machines:
+        return ""
+    try:
+        auth_db = netrc.netrc()
+    except (FileNotFoundError, netrc.NetrcParseError, OSError):
+        return ""
+    for machine in machines:
+        auth = auth_db.authenticators(machine)
+        if auth and auth[2]:
+            return auth[2]
+    return ""
+
+
+def get_huggingface_token_credential(name: str) -> str:
+    if name != "HF_TOKEN":
+        return ""
+    token_path = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")) / "token"
+    try:
+        return token_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
 def get_credential(name: str, prompt: bool) -> str:
     val = os.environ.get(name, "")
     if val:
         return val
+    val = get_netrc_credential(name)
+    if val:
+        return val
+    val = get_huggingface_token_credential(name)
+    if val:
+        return val
     if prompt:
         return getpass.getpass(f"Enter {name}: ")
-    sys.stderr.write(f"ERROR: ${name} is not set. Either export it or pass --prompt.\n")
+    sys.stderr.write(
+        f"ERROR: ${name} is not set and no matching local credential was found. "
+        "Either export it or pass --prompt.\n")
     sys.exit(2)
 
 
@@ -193,7 +240,11 @@ def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
 def submit_workflow(yaml_path: Path, set_args: dict, dry_run: bool) -> None:
     cmd = ["osmo", "workflow", "submit", str(yaml_path), "--set"]
     cmd += [f"{k}={v}" for k, v in set_args.items()]
-    print(f"+ {' '.join(shlex.quote(c) for c in cmd)}")
+    display_cmd = []
+    for token in cmd:
+        key, sep, _ = token.partition("=")
+        display_cmd.append(f"{key}=<redacted>" if sep and key in SENSITIVE_SET_ARGS else token)
+    print(f"+ {' '.join(shlex.quote(c) for c in display_cmd)}")
     if not dry_run:
         subprocess.check_call(cmd)
 
@@ -207,6 +258,7 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
         "image": image,
         "num_gpus": args.num_gpus,
+        "num_envs": args.num_envs,
         "wandb_api_key": wandb_key,
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,
@@ -229,6 +281,7 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "wandb_run_name": args.experiment_name,
         "hf_token": hf_token,
         "checkpoint_artifact": args.checkpoint,
+        "num_envs": args.num_envs,
         "distillation_ckpt_artifact": args.distillation_ckpt,
         "no_residual": "1" if args.no_residual else "",
         "embodiment": args.embodiment,

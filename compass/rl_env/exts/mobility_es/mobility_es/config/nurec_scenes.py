@@ -70,7 +70,10 @@ class NurecScene:
 # Add a scene by appending one self-describing line. Place its assets under
 # ``usd/<folder>/`` (the USD file + occupancy_map.yaml + .png).
 NUREC_SCENES = [
-    NurecScene("nova_carter-galileo", "NovaCarterGalileo_NuRec"),
+    NurecScene(
+        "nova_carter-galileo",
+        "NovaCarterGalileo_NuRec",
+    ),
     NurecScene("nova_carter-cafe", "NovaCarterCafe_NuRec"),
     NurecScene("hand_hold-endeavor-andoria", "HandHoldEndeavorAndoria_NuRec"),
     NurecScene("hand_hold-endeavor-livingroom", "HandHoldEndeavorLivingroom_NuRec"),
