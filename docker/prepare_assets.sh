@@ -3,12 +3,15 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Download COMPASS host-side assets (USDs + X-Mobility checkpoint) into ./assets/.
+# Optionally download NuRec scene folders into the mobility_es USD tree.
 #
 # Cache-aware: skips downloads when the target already exists and is non-empty.
 # Idempotent: safe to re-run.
 #
 # Usage:
 #   ./docker/prepare_assets.sh [--hf-token TOK] [--cache-dir DIR] [--force]
+#                              [--nurec-scene SCENE]
+#                              [--nurec-revision REV]
 #
 # Environment:
 #   HF_TOKEN  HuggingFace token (https://huggingface.co/settings/tokens)
@@ -32,6 +35,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CACHE_DIR="${REPO_ROOT}/assets"
 HF_TOKEN_ARG=""
 FORCE=false
+NUREC_SCENES=()
+NUREC_REVISION="${NUREC_REVISION:-refs/pr/34}"
 
 USDS_URL="https://huggingface.co/nvidia/COMPASS/resolve/main/compass_usds.zip"
 USDS_ZIP="${CACHE_DIR}/compass_usds.zip"
@@ -43,17 +48,20 @@ USDS_DIR="${REPO_ROOT}/compass/rl_env/exts/mobility_es/mobility_es/usd"
 
 CKPT_URL="https://huggingface.co/nvidia/X-Mobility/resolve/main/x_mobility-nav2-semantic_action_path.ckpt"
 CKPT_FILE="${CACHE_DIR}/x_mobility.ckpt"
+NUREC_REPO="nvidia/PhysicalAI-Robotics-NuRec"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Argument parsing.
 # ──────────────────────────────────────────────────────────────────────────────
 usage() {
-    sed -n '5,15p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    sed -n '5,18p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
     exit "${1:-0}"
 }
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --hf-token) HF_TOKEN_ARG="$2"; shift 2 ;;
+        --nurec-scene) NUREC_SCENES+=("$2"); shift 2 ;;
+        --nurec-revision) NUREC_REVISION="$2"; shift 2 ;;
         --cache-dir)
             # --cache-dir only redirects the zip + ckpt cache. USDS_DIR is
             # fixed by the package layout (see definition above).
@@ -194,6 +202,35 @@ download_ckpt() {
     info "Downloaded $(du -h "${CKPT_FILE}" | cut -f1) → ${CKPT_FILE}"
 }
 
+download_nurec_scenes() {
+    if [ "${#NUREC_SCENES[@]}" -eq 0 ]; then
+        return 0
+    fi
+
+    check_hf_token
+
+    local scene scene_dir
+    for scene in "${NUREC_SCENES[@]}"; do
+        scene_dir="${USDS_DIR}/${scene}"
+        if [ "${FORCE}" = true ]; then
+            rm -rf "${scene_dir}"
+        fi
+        if [ -d "${scene_dir}" ] && [ -n "$(ls -A "${scene_dir}" 2>/dev/null)" ]; then
+            info "NuRec scene ${scene} already installed at ${scene_dir} — skipping."
+            continue
+        fi
+
+        step "Downloading NuRec scene ${scene} from ${NUREC_REPO}@${NUREC_REVISION} → ${USDS_DIR}"
+        HF_TOKEN="${HF_TOKEN_EFFECTIVE}" hf download "${NUREC_REPO}" \
+            --repo-type dataset \
+            --revision "${NUREC_REVISION}" \
+            --local-dir "${USDS_DIR}" \
+            --include "${scene}/**" \
+            --exclude "**/raw_images.zip"
+        info "NuRec scene installed to ${scene_dir}"
+    done
+}
+
 show_summary() {
     step "Asset summary"
     echo "Cache dir: ${CACHE_DIR}"
@@ -206,6 +243,13 @@ show_summary() {
         echo "  ✓ X-Mobility ckpt: ${CKPT_FILE} ($(du -h "${CKPT_FILE}" | cut -f1))"
     else
         echo "  ✗ X-Mobility ckpt: ${CKPT_FILE} (missing)"
+    fi
+    if [ "${#NUREC_SCENES[@]}" -gt 0 ]; then
+        echo "  NuRec revision:   ${NUREC_REPO}@${NUREC_REVISION}"
+        local scene
+        for scene in "${NUREC_SCENES[@]}"; do
+            echo "  ✓ NuRec scene:     ${USDS_DIR}/${scene}"
+        done
     fi
     echo ""
     echo "The repo is bind-mounted at /workspace/COMPASS inside the container."
@@ -221,6 +265,7 @@ main() {
     prepare_dirs
     download_usds
     download_ckpt
+    download_nurec_scenes
     show_summary
     info "Done."
 }

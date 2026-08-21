@@ -1,0 +1,7 @@
+include 'configs/viewport_smoke.gin'
+
+run.num_steps_per_iteration = 20
+
+ResidualPPOTrainer.num_steps_per_env = 20
+ResidualPPOTrainer.debug_image_interval = 5
+ResidualPPOTrainer.max_debug_images = 4

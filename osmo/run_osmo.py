@@ -93,6 +93,10 @@ def parse_args():
                         default=os.environ.get("COMPASS_OSMO_REGISTRY", ""),
                         help="Registry prefix for build+push (e.g. nvcr.io/<org>/<team>); "
                         "defaults to $COMPASS_OSMO_REGISTRY.")
+        sp.add_argument("--dockerfile",
+                        default="",
+                        help="Dockerfile for build+push when --image is not provided. "
+                        "Defaults to the subcommand's configured Dockerfile.")
         sp.add_argument("--dry-run",
                         action="store_true",
                         help="Print the osmo workflow submit command without executing it.")
@@ -113,10 +117,7 @@ def parse_args():
                        help="Skip the residual head (use base policy only).")
     train.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     train.add_argument("--environment", default="", help="Override the gin-config environment.")
-    train.add_argument("--num-envs",
-                       type=int,
-                       default=32,
-                       help="Number of Isaac Lab envs per GPU.")
+    train.add_argument("--num-envs", type=int, default=32, help="Number of Isaac Lab envs per GPU.")
     train.add_argument("--num-gpus",
                        type=int,
                        default=8,
@@ -185,10 +186,16 @@ def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
         sys.stderr.write("ERROR: --image not given and --registry-prefix is empty "
                          "(also $COMPASS_OSMO_REGISTRY).\n")
         sys.exit(2)
+    dockerfile_path = Path(dockerfile)
+    if not dockerfile_path.is_absolute():
+        dockerfile_path = REPO_ROOT / dockerfile_path
     image = f"{registry_prefix.rstrip('/')}/compass_{experiment}:{uuid.uuid4().hex[:8]}"
     cmds = [
-        ["docker", "build", "--network=host", "-t", image, "-f", dockerfile,
-         str(REPO_ROOT)],
+        [
+            "docker", "build", "--network=host", "-t", image, "-f",
+            str(dockerfile_path),
+            str(REPO_ROOT)
+        ],
         ["docker", "push", image],
     ]
     for cmd in cmds:
@@ -295,7 +302,7 @@ def main() -> None:
     if args.image:
         image = args.image
     else:
-        dockerfile = SUBCOMMAND_CONFIG[args.subcommand][1]
+        dockerfile = args.dockerfile or SUBCOMMAND_CONFIG[args.subcommand][1]
         image = build_and_push_image(args.experiment_name, args.registry_prefix, dockerfile,
                                      args.dry_run)
 

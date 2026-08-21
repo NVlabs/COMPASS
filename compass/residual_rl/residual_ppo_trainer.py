@@ -718,8 +718,181 @@ class ResidualPPOTrainer:
                                               image_path=grid_image_path,
                                               step=iteration)
 
+            self._save_debug_viewport_image(iteration, step)
+
         except (KeyError, IOError, OSError, ValueError, RuntimeError, AttributeError) as e:
             print(f"Warning: Failed to save debug images: {e}")
+
+    def _save_debug_viewport_image(self, iteration, step):
+        """Best-effort capture of the active Kit viewport for debugging GUI camera issues."""
+        if not self.is_rank_zero:
+            return
+
+        try:
+            import asyncio
+            import omni.kit.viewport.utility as viewport_utils
+
+            viewport = viewport_utils.get_active_viewport()
+            if viewport is None:
+                return
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            filename = f"kit_viewport_iter_{iteration:04d}_step_{step:04d}_{timestamp}.png"
+            filepath = os.path.join(self.debug_images_dir, filename)
+            capture_helper = viewport_utils.capture_viewport_to_file(viewport, file_path=filepath)
+
+            if hasattr(capture_helper, "wait_for_result"):
+                wait_task = capture_helper.wait_for_result(completion_frames=5)
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(wait_task)
+                else:
+                    loop.run_until_complete(wait_task)
+
+            metadata_path = f"{filepath}.txt"
+            with open(metadata_path, "w", encoding="utf-8") as metadata_file:
+                metadata_file.write(f"camera_path: {viewport.camera_path}\n")
+                metadata_file.write(
+                    f"render_product_path: {getattr(viewport, 'render_product_path', '')}\n")
+                metadata_file.write(f"resolution: {getattr(viewport, 'resolution', '')}\n")
+                self._write_debug_viewport_pose_metadata(metadata_file, viewport)
+                self._write_debug_viewport_stage_metadata(metadata_file, viewport)
+
+        except Exception as exc:    # pylint: disable=broad-except
+            print(f"Warning: Failed to save Kit viewport debug image: {type(exc).__name__}: {exc}")
+
+    def _write_debug_viewport_pose_metadata(self, metadata_file, viewport):
+        try:
+            import omni.usd
+            from pxr import UsdGeom
+
+            stage = omni.usd.get_context().get_stage()
+            camera_prim = stage.GetPrimAtPath(str(viewport.camera_path)) if stage else None
+            if camera_prim and camera_prim.IsValid():
+                transform = UsdGeom.XformCache().GetLocalToWorldTransform(camera_prim)
+                metadata_file.write(f"camera_world_transform: {transform}\n")
+
+            robot = self.env.unwrapped.scene["robot"]
+            root_pos = robot.data.root_pos_w[0].detach().cpu().numpy().tolist()
+            root_quat = robot.data.root_quat_w[0].detach().cpu().numpy().tolist()
+            metadata_file.write(f"robot_root_pos_w: {root_pos}\n")
+            metadata_file.write(f"robot_root_quat_w: {root_quat}\n")
+        except Exception as exc:    # pylint: disable=broad-except
+            metadata_file.write(
+                f"pose_metadata_error: {type(exc).__name__}: {exc}\n")
+
+    def _write_debug_viewport_stage_metadata(self, metadata_file, viewport):
+        try:
+            import omni.usd
+            from isaaclab.app.settings_manager import get_settings_manager
+            from pxr import UsdGeom
+
+            stage = omni.usd.get_context().get_stage()
+            if stage is None:
+                metadata_file.write("stage_metadata_error: no active USD stage\n")
+                return
+
+            settings = get_settings_manager()
+            for setting_path in [
+                    "/rtx/spg/enabled",
+                    "/rtx/geometry/gaussian/enabled",
+                    "/rtx/rendermode",
+                    "/rtx/post/aa/op",
+                    "/rtx/rtpt/gaussian/accumulatedDepth/allHits/enabled",
+                    "/rtx/rtpt/gaussian/accumulatedAlbedo/enabled",
+                    "/rtx/rtpt/gaussian/maxGaussiansToAccumulate",
+                    "/omni/rtx/nre/compositing/disableNuRecPostProcessings",
+                    "/omni/rtx/nre/compositing/rendererHints",
+                    "/rtx/post/registeredCompositing/invertColorCorrection",
+                    "/rtx/post/registeredCompositing/invertToneMap",
+                    "/rtx/scenePartitioning/showAllPartitionsByDefault",
+            ]:
+                metadata_file.write(f"setting {setting_path}: {settings.get(setting_path)!r}\n")
+
+            self._write_debug_prim_metadata(metadata_file, stage, str(viewport.camera_path))
+            self._write_debug_render_product_metadata(
+                metadata_file, stage, str(getattr(viewport, "render_product_path", "")))
+            self._write_debug_prim_metadata(metadata_file, stage, "/World/envs/env_0")
+            self._write_debug_prim_metadata(metadata_file, stage, "/World/envs/env_0/Robot")
+
+            env_prim = stage.GetPrimAtPath("/World/envs/env_0")
+            if env_prim and env_prim.IsValid():
+                metadata_file.write("env_0_children:\n")
+                for child in env_prim.GetChildren():
+                    self._write_debug_prim_metadata(metadata_file, stage,
+                                                    str(child.GetPath()), prefix="  ")
+
+            sim = getattr(getattr(self.env, "unwrapped", self.env), "sim", None)
+            if sim is not None:
+                visualizers = getattr(sim, "visualizers", [])
+                metadata_file.write(f"visualizer_count: {len(visualizers)}\n")
+                for index, visualizer in enumerate(visualizers):
+                    cfg = getattr(visualizer, "cfg", None)
+                    metadata_file.write(
+                        f"visualizer[{index}]: "
+                        f"type={getattr(cfg, 'visualizer_type', None)!r}, "
+                        f"eye={getattr(cfg, 'eye', None)!r}, "
+                        f"lookat={getattr(cfg, 'lookat', None)!r}, "
+                        f"origin_type={getattr(cfg, 'origin_type', None)!r}, "
+                        f"origin_track_path={getattr(cfg, 'origin_track_path', None)!r}, "
+                        f"viewer_origin={getattr(visualizer, 'viewer_origin', None)!r}, "
+                        f"controlled_camera={getattr(visualizer, '_controlled_camera_path', None)!r}\n")
+
+        except Exception as exc:    # pylint: disable=broad-except
+            metadata_file.write(
+                f"stage_metadata_error: {type(exc).__name__}: {exc}\n")
+
+    def _write_debug_prim_metadata(self, metadata_file, stage, prim_path, prefix=""):
+        from pxr import UsdGeom
+
+        prim = stage.GetPrimAtPath(prim_path)
+        if not prim or not prim.IsValid():
+            metadata_file.write(f"{prefix}prim {prim_path}: invalid\n")
+            return
+
+        visibility = None
+        imageable = UsdGeom.Imageable(prim)
+        if imageable:
+            visibility = imageable.GetVisibilityAttr().Get()
+
+        partition = prim.GetAttribute("omni:scenePartition")
+        primvar_partition = prim.GetAttribute("primvars:omni:scenePartition")
+        metadata_file.write(
+            f"{prefix}prim {prim_path}: "
+            f"type={prim.GetTypeName()!r}, "
+            f"active={prim.IsActive()}, "
+            f"visibility={visibility!r}, "
+            f"scenePartition={partition.Get() if partition.IsValid() else None!r}, "
+            f"primvarScenePartition={primvar_partition.Get() if primvar_partition.IsValid() else None!r}\n")
+        if prim.GetTypeName() == "Camera":
+            for attr_name in [
+                    "exposure",
+                    "exposure:fStop",
+                    "exposure:iso",
+                    "exposure:responsivity",
+                    "exposure:time",
+                    "omni:rtx:autoExposure:enabled",
+            ]:
+                attr = prim.GetAttribute(attr_name)
+                metadata_file.write(
+                    f"{prefix}  camera_attr {attr_name}: "
+                    f"{attr.Get() if attr.IsValid() else None!r}\n")
+
+    def _write_debug_render_product_metadata(self, metadata_file, stage, render_product_path):
+        prim = stage.GetPrimAtPath(render_product_path)
+        if not prim or not prim.IsValid():
+            metadata_file.write(f"render_product {render_product_path}: invalid\n")
+            return
+
+        camera_rel = prim.GetRelationship("camera")
+        resolution_attr = prim.GetAttribute("resolution")
+        child_names = [child.GetName() for child in prim.GetChildren()]
+        metadata_file.write(
+            f"render_product {render_product_path}: "
+            f"type={prim.GetTypeName()!r}, "
+            f"camera_targets={[str(path) for path in camera_rel.GetTargets()]}, "
+            f"resolution={resolution_attr.Get() if resolution_attr.IsValid() else None!r}, "
+            f"children={child_names!r}\n")
 
     def _create_image_grid(self, images, subtitles, iteration, step, grid_idx=0):
         """Create and save a grid of images. Returns the filepath of the saved image."""

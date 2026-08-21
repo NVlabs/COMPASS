@@ -29,7 +29,6 @@ python run.py \
     -o <output_dir> \
     -b <path/to/x_mobility_ckpt> \
     -d <path/to/generalist_policy_ckpt> \
-    --enable_cameras \
     --video \
     --video_interval <video_interval>
 ```

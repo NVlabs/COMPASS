@@ -1,0 +1,10 @@
+include 'configs/train_config_real2sim.gin'
+
+run.num_iterations = 1
+run.num_envs = 1
+run.num_steps_per_iteration = 2
+run.precompute_valid_poses = False
+
+ResidualPPOTrainer.num_steps_per_env = 2
+ResidualPPOTrainer.debug_image_interval = 1
+ResidualPPOTrainer.max_debug_images = 1

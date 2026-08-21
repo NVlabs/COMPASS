@@ -145,6 +145,12 @@ Key options:
 - `--environment`: any registered NuRec scene.
 - `--num_envs 12`: conservative default; increase only after checking VRAM.
 - `--precompute_valid_poses`: recommended for constrained Real2Sim scenes.
+- With `--visualizer kit`, the GUI uses the Kit perspective camera; debug
+  images and policy observations still use the robot camera sensor. For NuRec
+  scenes, COMPASS routes that perspective camera through a copied PPISP
+  RenderProduct, but keeps the generic Kit camera exposure to avoid clipping.
+- Debug dumps include `camera_grid_*.png` for robot-camera RGB/depth and
+  `kit_viewport_*.png` plus `kit_viewport_*.png.txt` for the GUI viewport.
 
 Output checkpoints are written as `<output_dir>/model_<iter>.pt`; videos land
 in `<output_dir>/videos/`.
