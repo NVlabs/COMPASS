@@ -18,12 +18,14 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 
+# pylint: disable=wrong-import-position
 import numpy as np
 import h5py
 import gin
 # Set matplotlib backend before importing pyplot to avoid GUI backend issues
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend for headless environments
+
+matplotlib.use('Agg')    # Use non-interactive backend for headless environments
 import matplotlib.pyplot as plt
 import torch
 import torch.distributed as dist
@@ -121,7 +123,7 @@ class ResidualPPOTrainer:
         # each grid is comprised of 8 images, and so for 64 envs, there would be
         # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
         self.max_debug_images = max_debug_images
-        # Save images every `debug_image_interval` iterations
+        # Save images every `debug_image_interval` rollout steps.
         self.debug_image_interval = debug_image_interval
 
         self.env.reset()
@@ -318,7 +320,7 @@ class ResidualPPOTrainer:
                             times[f"rollout/env_step/{_k}"] = times.get(
                                 f"rollout/env_step/{_k}", 0.0) + _v
 
-                        # Save debug camera grids (self-gated by max_debug_images / interval / step).
+                        # Save debug camera grids, gated by interval and step.
                         self._save_debug_images(obs_dict, it, _)
 
                         # Move time out information to the extras dict
@@ -589,7 +591,7 @@ class ResidualPPOTrainer:
                                   step=target_iteration)
 
     def _save_debug_images(self, obs_dict, iteration, step):
-        """Save debug images from all cameras as multiple grids for 1 step during training."""
+        """Save debug images from all cameras as multiple grids during training."""
         try:
             if self.max_debug_images is None or self.max_debug_images == 0:
                 return
@@ -597,12 +599,7 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            # Only save images for the first step to avoid too many files
-            if step != 0:
-                return
-
-            # Only save images at specified iteration intervals
-            if iteration % self.debug_image_interval != 0:
+            if self.debug_image_interval <= 0 or step % self.debug_image_interval != 0:
                 return
 
             camera_rgb = obs_dict["policy"]["camera_rgb_img"]
@@ -635,7 +632,8 @@ class ResidualPPOTrainer:
 
                 for env_idx in range(start_env, end_env):
                     # Process RGB image
-                    rgb_img = rgb_images_np[env_idx].copy()  # Make a copy to avoid modifying original
+                    rgb_img = rgb_images_np[env_idx].copy(
+                    )    # Make a copy to avoid modifying original
 
                     # Handle different image shapes - camera images are flattened in observations
                     if len(rgb_img.shape) == 1:
@@ -646,7 +644,8 @@ class ResidualPPOTrainer:
                         if rgb_img.size == expected_size:
                             rgb_img = rgb_img.reshape(height, width, channels)
                         else:
-                            print(f"[WARNING] Image size mismatch: expected {expected_size}, got {rgb_img.size}")
+                            print("[WARNING] Image size mismatch: "
+                                  f"expected {expected_size}, got {rgb_img.size}")
                             continue
                     elif len(rgb_img.shape) == 3:
                         # Already in (H, W, C) or (C, H, W) format
@@ -786,8 +785,13 @@ class ResidualPPOTrainer:
             plt.tight_layout()
             # Use PNG format for better compatibility and lossless quality
             # Set format explicitly and ensure proper saving
-            plt.savefig(filepath, dpi=150, bbox_inches='tight', format='png',
-                       facecolor='white', edgecolor='none', pad_inches=0.1)
+            plt.savefig(filepath,
+                        dpi=150,
+                        bbox_inches='tight',
+                        format='png',
+                        facecolor='white',
+                        edgecolor='none',
+                        pad_inches=0.1)
             plt.close()
 
             # Verify file was created and is readable

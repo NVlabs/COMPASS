@@ -17,7 +17,7 @@ import os
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import AssetBaseCfg
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 USD_PATHS = {
@@ -43,9 +43,9 @@ USD_PATHS = {
     'Hospital':
         f'{ISAAC_NUCLEUS_DIR}/Environments/Hospital/hospital.usd',
     # NuRec scene entries are injected here from nurec_scenes.py (imported at end of file).
-    # This is example manual entry scene kept for reference.
+    # Example manual entry scene kept for reference.
     # 'NovaCarterGalileo_NuRec':
-    #     os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/3dgrt/real2sim_galileo.usd"),
+    #     os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/..."),
 }
 
 # Values may be a string path for legacy COMPASS top-left-origin maps, or a dict
@@ -72,7 +72,7 @@ OMAP_PATHS = {
     # Example to show how we can define OMAP_PATHS with origin_convention
     # 'NovaCarterGalileo_NuRec':
     #     {
-    #         "path": os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/occupancy_map.yaml"),
+    #         "path": os.path.join(os.path.dirname(__file__), "../usd/.../occupancy_map.yaml"),
     #         "origin_convention": "bottom-left"
     #     },
 }
@@ -95,7 +95,6 @@ class EnvSceneAssetCfg(AssetBaseCfg):
 
 # NuRec Real2Sim scenes are defined in ``nurec_scenes.py`` and registered into
 # USD_PATHS / OMAP_PATHS / ``nurec_envs`` via a bottom-of-file import (see end of module).
-
 
 # Adding a USD scene with combined office, galileo lab and warehouse single rack.
 combined_single_rack = EnvSceneAssetCfg(
@@ -287,8 +286,5 @@ random_envs = EnvSceneAssetCfg(
 #     env_spacing=500,
 # )
 
-
-# Register NuRec Real2Sim scenes (defined in nurec_scenes.py). Imported at the bottom so
-# EnvSceneAssetCfg / USD_PATHS / OMAP_PATHS already exist; importing nurec_scenes injects the
-# NuRec entries into USD_PATHS/OMAP_PATHS and re-exports ``nurec_envs`` (used by run.py).
-from mobility_es.config.nurec_scenes import nurec_envs  # noqa: E402,F401  pylint: disable=wrong-import-position,unused-import
+# Register NuRec Real2Sim scenes after EnvSceneAssetCfg / USD_PATHS / OMAP_PATHS exist.
+from mobility_es.config.nurec_scenes import nurec_envs    # noqa: E402,F401  pylint: disable=wrong-import-position,unused-import,cyclic-import

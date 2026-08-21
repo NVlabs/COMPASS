@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """NuRec Real2Sim scene registry (PhysicalAI-Robotics-NuRec dataset).
 
 Each NuRec scene shares the same flat asset layout under ``usd/<folder>/`` and the
@@ -40,7 +39,7 @@ from mobility_es.config.environments import EnvSceneAssetCfg, OMAP_PATHS, USD_PA
 _USD_DIR = os.path.join(os.path.dirname(__file__), "../usd")
 
 # Defaults shared by all scenes; override per-scene via NurecScene fields.
-DEFAULT_USD_FILE = "stage_particle_spg.usdz"
+DEFAULT_USD_FILE = "particle_spg-runtime.usdz"
 DEFAULT_OMAP_FILE = "occupancy_map.yaml"
 DEFAULT_ORIGIN_CONVENTION = "bottom-left"
 DEFAULT_ENV_SPACING = 500.0
@@ -70,14 +69,18 @@ class NurecScene:
 # Add a scene by appending one self-describing line. Place its assets under
 # ``usd/<folder>/`` (the USD file + occupancy_map.yaml + .png).
 NUREC_SCENES = [
-    NurecScene("nova_carter-galileo", "NovaCarterGalileo_NuRec"),
+    NurecScene(
+        "nova_carter-galileo",
+        "NovaCarterGalileo_NuRec",
+    ),
     NurecScene("nova_carter-cafe", "NovaCarterCafe_NuRec"),
     NurecScene("hand_hold-endeavor-andoria", "HandHoldEndeavorAndoria_NuRec"),
     NurecScene("hand_hold-endeavor-livingroom", "HandHoldEndeavorLivingroom_NuRec"),
     NurecScene("hand_hold-endeavor-wormhole", "HandHoldEndeavorWormhole_NuRec"),
     NurecScene("hand_hold-endeavor-wormhole-table", "HandHoldEndeavorWormholeTable_NuRec"),
     NurecScene("hand_hold-voyager-babyboom", "HandHoldVoyagerBabyboom_NuRec"),
-    NurecScene("xgrid-wormhole", "XgridWormhole_NuRec",
+    NurecScene("xgrid-wormhole",
+               "XgridWormhole_NuRec",
                usd_file="stage_particle_with_sim_objects.usd",
                omap_file="occupancy_map_with_sim_objects.yaml"),
 ]

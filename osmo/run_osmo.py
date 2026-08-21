@@ -113,6 +113,10 @@ def parse_args():
                        help="Skip the residual head (use base policy only).")
     train.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     train.add_argument("--environment", default="", help="Override the gin-config environment.")
+    train.add_argument("--num-envs",
+                       type=int,
+                       default=32,
+                       help="Number of Isaac Lab envs per GPU.")
     train.add_argument("--num-gpus",
                        type=int,
                        default=8,
@@ -136,6 +140,10 @@ def parse_args():
                      help="Evaluate without the residual head (base policy only).")
     evl.add_argument("--embodiment", default="", help="Override the gin-config embodiment.")
     evl.add_argument("--environment", default="", help="Override the gin-config environment.")
+    evl.add_argument("--num-envs",
+                     type=int,
+                     default=32,
+                     help="Number of Isaac Lab envs for evaluation.")
 
     rec = sub.add_parser("record", help="Submit distillation-data recording.")
     add_common(rec)
@@ -207,6 +215,7 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
         "image": image,
         "num_gpus": args.num_gpus,
+        "num_envs": args.num_envs,
         "wandb_api_key": wandb_key,
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,
@@ -229,6 +238,7 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "wandb_run_name": args.experiment_name,
         "hf_token": hf_token,
         "checkpoint_artifact": args.checkpoint,
+        "num_envs": args.num_envs,
         "distillation_ckpt_artifact": args.distillation_ckpt,
         "no_residual": "1" if args.no_residual else "",
         "embodiment": args.embodiment,

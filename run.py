@@ -84,7 +84,7 @@ parser.add_argument("--camera_sensor_name",
                     type=str,
                     default="camera",
                     help="Name of the onboard camera sensor in env.scene.sensors "
-                         "used for robot-camera video recording (default: 'camera').")
+                    "used for robot-camera video recording (default: 'camera').")
 # Optional parameters to override gin config.
 parser.add_argument('--embodiment', type=str, help='Embodiment type')
 parser.add_argument('--environment', type=str, help='Environment type')
@@ -97,7 +97,7 @@ parser.add_argument('--precompute_valid_orientations',
                     action='store_true',
                     default=False,
                     help='Precompute valid orientations for each pose location. '
-                         'If False, uses randomly generated orientations.')
+                    'If False, uses randomly generated orientations.')
 parser.add_argument('--disable_terrain',
                     action='store_true',
                     default=False,
@@ -117,7 +117,7 @@ AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
 # launch omniverse app
-app_launcher = AppLauncher(args_cli)
+app_launcher = AppLauncher(args_cli, enable_cameras=True)
 simulation_app = app_launcher.app
 
 import gin
@@ -323,9 +323,9 @@ def run(run_mode,
     if 'newton' in _requested_viz:
         from isaaclab_visualizers.newton import NewtonVisualizerCfg
         newton_viz_cfg = NewtonVisualizerCfg()
-        newton_viz_cfg.eye = (-2.5, -0.5, 1.5)      # initial interactive framing
+        newton_viz_cfg.eye = (-2.5, -0.5, 1.5)    # initial interactive framing
         newton_viz_cfg.lookat = (0.0, 0.0, 0.0)
-        newton_viz_cfg.tiled_cam_view = True        # follow-cam panel (Newton's follow path)
+        newton_viz_cfg.tiled_cam_view = True    # follow-cam panel (Newton's follow path)
         newton_viz_cfg.tiled_cam_num = 1
         newton_viz_cfg.tiled_cam_target_prim_path = "/World/envs/*/Robot"
         newton_viz_cfg.tiled_cam_eye = (-2.5, -0.5, 1.5)

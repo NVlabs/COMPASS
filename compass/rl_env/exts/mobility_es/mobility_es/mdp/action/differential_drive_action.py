@@ -21,7 +21,7 @@ from dataclasses import MISSING
 
 from isaaclab.assets.articulation import Articulation
 from isaaclab.managers.action_manager import ActionTerm, ActionTermCfg
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 
 from mobility_es.mdp.action.action_visualization import ActionVisualizer
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper

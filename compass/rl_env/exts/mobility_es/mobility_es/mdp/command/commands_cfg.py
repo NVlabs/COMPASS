@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from isaaclab.envs.mdp import commands
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 from isaaclab.markers.config import GREEN_ARROW_X_MARKER_CFG
 
 from mobility_es.mdp.command.uniform_collision_free_pose_command import UniformCollisionFreePoseCommand
