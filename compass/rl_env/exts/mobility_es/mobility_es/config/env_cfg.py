@@ -314,7 +314,7 @@ class GoalReachingEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 20
         self.episode_length_s = EPISODE_LENGTH_S
-        self.num_rerenders_on_reset = 5
+        self.num_rerenders_on_reset = 10
         # simulation settings
         self.sim.dt = 0.005
         self.sim.physics = PhysxCfg(bounce_threshold_velocity=0.2)

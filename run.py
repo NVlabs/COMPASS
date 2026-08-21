@@ -185,8 +185,9 @@ EnvSceneAssetCfgMap.update(environments.nurec_envs)
 
 KIT_PERSPECTIVE_CAMERA_PATH = "/OmniverseKit_Persp"
 KIT_PPISP_RENDER_PRODUCT_PATH = "/Render/COMPASS_KitPerspective_PPISP"
+NUREC_VIEWPORT_SOURCE_RENDER_PRODUCT_PATH = "/Render/front_stereo_camera_left__0"
 KIT_SCENE_PARTITION = "env_0"
-KIT_VIEWER_EYE = (1.75, -1.5, 2.2)
+KIT_VIEWER_EYE = (-2.5, -0.5, 1.5)
 KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
 
 
@@ -219,37 +220,23 @@ def _configure_kit_visualizer(env_cfg):
     _append_visualizer_cfg(env_cfg, kit_viz_cfg)
 
 
-def _choose_nurec_render_product(render_products):
-    front_products = [path for path in render_products if "front" in path.lower()]
-    candidates = front_products or render_products
-    return sorted(candidates)[0] if candidates else None
-
-
-def _render_product_has_ppisp(prim):
-    for child in prim.GetChildren():
-        name = child.GetName()
-        if name.startswith("PPISP"):
-            return True
-        spg_attr = child.GetAttribute("info:spg:sourceAsset")
-        if spg_attr and spg_attr.HasAuthoredValue():
-            return True
-    return False
-
-
-def _find_ppisp_render_products(stage):
-    render_products = []
-    for prim in stage.Traverse():
-        if prim.GetTypeName() == "RenderProduct" and _render_product_has_ppisp(prim):
-            render_products.append(str(prim.GetPath()))
-    return render_products
-
-
 def _package_qualified_asset(package_path, asset_path):
     if not asset_path:
         return asset_path
     if "[" in asset_path:
         return asset_path
     return f"{package_path}[{os.path.basename(asset_path)}]"
+
+
+def _format_render_product_choices(stage):
+    choices = []
+    for prim in stage.Traverse():
+        if prim.GetTypeName() != "RenderProduct":
+            continue
+        targets = prim.GetRelationship("camera").GetTargets()
+        camera_path = str(targets[0]) if targets else "<no camera target>"
+        choices.append(f"{prim.GetPath()} -> {camera_path}")
+    return "\n".join(f"  {choice}" for choice in sorted(choices)) or "  <none>"
 
 
 def _copy_source_ppisp_render_product(stage, source_usd_path):
@@ -259,12 +246,18 @@ def _copy_source_ppisp_render_product(stage, source_usd_path):
     if source_stage is None:
         raise RuntimeError(f"Could not open NuRec USD: {source_usd_path}")
 
-    source_render_products = _find_ppisp_render_products(source_stage)
-    source_rp_path = _choose_nurec_render_product(source_render_products)
-    if source_rp_path is None:
-        raise RuntimeError(f"No PPISP RenderProduct found in NuRec USD: {source_usd_path}")
-
+    source_rp_path = NUREC_VIEWPORT_SOURCE_RENDER_PRODUCT_PATH
     source_rp_prim = source_stage.GetPrimAtPath(source_rp_path)
+    if not source_rp_prim or not source_rp_prim.IsValid():
+        raise RuntimeError(
+            f"NuRec viewport RenderProduct does not exist in {source_usd_path}: "
+            f"{source_rp_path}\nAvailable RenderProducts:\n"
+            f"{_format_render_product_choices(source_stage)}")
+    if source_rp_prim.GetTypeName() != "RenderProduct":
+        raise RuntimeError(
+            f"NuRec viewport path is not a RenderProduct in {source_usd_path}: "
+            f"{source_rp_path} (type={source_rp_prim.GetTypeName()!r})")
+
     prim_stack = source_rp_prim.GetPrimStack()
     if not prim_stack:
         raise RuntimeError(f"PPISP RenderProduct has empty prim stack: {source_rp_path}")
@@ -279,6 +272,9 @@ def _copy_source_ppisp_render_product(stage, source_usd_path):
         if stage.GetPrimAtPath(KIT_PPISP_RENDER_PRODUCT_PATH).IsValid():
             stage.RemovePrim(dst_path)
 
+    # Clone the NuRec camera PPISP graph for the GUI viewport. Binding the
+    # authored robot-camera RenderProduct directly would switch the viewport to
+    # that camera, or mutate the sensor RenderProduct used by observations.
     Sdf.CreatePrimInLayer(session, dst_path)
     Sdf.CopySpec(source_layer, src_path, session, dst_path)
 
@@ -324,13 +320,28 @@ def _apply_render_settings_from_stage(source_stage):
         settings.set("/" + str(key).replace(":", "/"), value)
 
 
-def _configure_nurec_viewport_compositing_settings():
-    import carb.settings
+def _apply_nurec_identity_exposure_to_camera(stage, camera_path):
+    from pxr import Sdf, Usd
 
-    settings = carb.settings.get_settings()
-    settings.set_bool("/omni/rtx/nre/compositing/disableNuRecPostProcessings", True)
-    settings.set_bool("/rtx/post/registeredCompositing/invertColorCorrection", False)
-    settings.set_bool("/rtx/post/registeredCompositing/invertToneMap", False)
+    camera_prim = stage.GetPrimAtPath(camera_path)
+    if not camera_prim or not camera_prim.IsValid() or camera_prim.GetTypeName() != "Camera":
+        return
+
+    identity_exposure = {
+        "exposure": 0.0,
+        "exposure:fStop": 1.0,
+        "exposure:iso": 0.0,
+        "exposure:responsivity": 1.0,
+        "exposure:time": 1.0,
+    }
+
+    with Usd.EditContext(stage, stage.GetSessionLayer()):
+        camera_prim.AddAppliedSchema("OmniRtxCameraAutoExposureAPI_1")
+        camera_prim.AddAppliedSchema("OmniRtxCameraExposureAPI_1")
+        for name, value in identity_exposure.items():
+            camera_prim.CreateAttribute(name, Sdf.ValueTypeNames.Float).Set(value)
+        camera_prim.CreateAttribute(
+            "omni:rtx:autoExposure:enabled", Sdf.ValueTypeNames.Bool).Set(False)
 
 
 def _bind_nurec_ppisp_render_product(stage, viewport, nurec_usd_path, quiet=False):
@@ -339,6 +350,7 @@ def _bind_nurec_ppisp_render_product(stage, viewport, nurec_usd_path, quiet=Fals
 
     try:
         render_product_path, source_stage = _copy_source_ppisp_render_product(stage, nurec_usd_path)
+        _apply_nurec_identity_exposure_to_camera(stage, KIT_PERSPECTIVE_CAMERA_PATH)
         viewport.render_product_path = render_product_path
         if str(getattr(viewport, "render_product_path", "")) != render_product_path:
             if not quiet:
@@ -348,10 +360,6 @@ def _bind_nurec_ppisp_render_product(stage, viewport, nurec_usd_path, quiet=Fals
             return None
 
         _apply_render_settings_from_stage(source_stage)
-        _configure_nurec_viewport_compositing_settings()
-        # Do not force the authored NuRec identity exposure onto /OmniverseKit_Persp.
-        # The replay cameras use that exposure with their authored camera model, but
-        # smoke tests showed it clips the generic Kit perspective camera to white.
         return render_product_path
     except Exception as exc:    # pylint: disable=broad-except
         if not quiet:

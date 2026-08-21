@@ -136,6 +136,7 @@ python run.py \
     --video \
     --video_interval 1 \
     --visualizer kit \
+    --kit_args "--/rtx/spg/enabled=true --/omni/rtx/nre/compositing/disableNuRecPostProcessings=true --/rtx/rtpt/gaussian/skipTonemapping/enabled=false --enable omni.rtx.spg" \
     --precompute_valid_poses
 ```
 
@@ -148,7 +149,9 @@ Key options:
 - With `--visualizer kit`, the GUI uses the Kit perspective camera; debug
   images and policy observations still use the robot camera sensor. For NuRec
   scenes, COMPASS routes that perspective camera through a copied PPISP
-  RenderProduct, but keeps the generic Kit camera exposure to avoid clipping.
+  RenderProduct and applies neutral PPISP exposure to the Kit camera. Keep the
+  `--kit_args` line above so the GUI viewport loads SPG and NuRec compositing
+  before the viewport RenderProduct is created.
 - Debug dumps include `camera_grid_*.png` for robot-camera RGB/depth and
   `kit_viewport_*.png` plus `kit_viewport_*.png.txt` for the GUI viewport.
 
@@ -326,6 +329,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     --video \
     --video_interval 1 \
     --visualizer kit \
+    --kit_args "--/rtx/spg/enabled=true --/omni/rtx/nre/compositing/disableNuRecPostProcessings=true --/rtx/rtpt/gaussian/skipTonemapping/enabled=false --enable omni.rtx.spg" \
     --precompute_valid_poses
 ```
 
