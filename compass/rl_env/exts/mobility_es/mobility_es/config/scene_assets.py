@@ -45,9 +45,7 @@ camera = TiledCameraCfg(
         enable_dl_denoiser=True,
         antialiasing_mode="DLSS",
         carb_settings={
-            "/rtx/spg/enabled": True,
             "/rtx/rtpt/gaussian/skipTonemapping/enabled": False,
-            "/omni/rtx/nre/compositing/disableNuRecPostProcessings": True,
             "/rtx/rtpt/gaussian/accumulatedDepth/allHits/enabled": True,
             "/rtx/rtpt/gaussian/accumulatedAlbedo/enabled": True,
             "/rtx/rtpt/gaussian/maxGaussiansToAccumulate": 360,

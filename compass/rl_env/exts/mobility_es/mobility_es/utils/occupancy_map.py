@@ -155,14 +155,16 @@ class OccupancyMapCollisionChecker:
     def is_initialized(self):
         return self.__grid_map is not None
 
-    def precompute_valid_poses(self, start_collision_distance, goal_collision_distance,
+    def precompute_valid_poses(self,
+                               start_collision_distance,
+                               goal_collision_distance,
                                precompute_valid_orientations=False):
         """Precompute valid pose locations for start and goal poses.
         Args:
             start_collision_distance (float): Collision distance for start pose sampling (in meters)
             goal_collision_distance (float): Collision distance for goal pose sampling (in meters)
-            precompute_valid_orientations (bool): Whether to precompute valid orientations for each pose.
-                Defaults to False.
+            precompute_valid_orientations (bool): Whether to precompute valid orientations
+                for each pose. Defaults to False.
         """
         if not self.is_initialized():
             print("Warning: Cannot precompute valid poses - collision checker not initialized")
@@ -202,7 +204,8 @@ class OccupancyMapCollisionChecker:
             # Invert: True=free, False=occupied
             goal_free_space_map = np.logical_not(goal_buffered_map)
             self.__goal_pose_valid_orientations = self._compute_valid_orientations(
-                self.__goal_pose_valid_locations, goal_free_space_map, 2.0 * goal_collision_distance)
+                self.__goal_pose_valid_locations, goal_free_space_map,
+                2.0 * goal_collision_distance)
         else:
             # Set to None to indicate orientations are not precomputed
             self.__start_pose_valid_orientations = None
@@ -292,7 +295,7 @@ class OccupancyMapCollisionChecker:
             height_pixels = free_space_map.shape[0]
             height_meters = height_pixels * resolution
             img_y = int((origin[1] + height_meters - world_pos[1]) / resolution)
-        else:  # 'top-left' (default, COMPASS original)
+        else:    # 'top-left' (default, COMPASS original)
             img_y = int((origin[1] - world_pos[1]) / resolution)
 
         # Check bounds
@@ -387,7 +390,7 @@ class OccupancyMapCollisionChecker:
             height_pixels = grid_map.shape[0]
             height_meters = height_pixels * resolution
             world_y = origin[1] + height_meters - img_coords[:, 1] * resolution
-        else:  # 'top-left' (default, COMPASS original)
+        else:    # 'top-left' (default, COMPASS original)
             world_y = origin[1] - img_coords[:, 1] * resolution
 
         return np.stack([world_x, world_y], axis=1)

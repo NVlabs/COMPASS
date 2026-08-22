@@ -53,7 +53,8 @@ class ResidualPPOTrainer:
                  ckpt_save_interval=50,
                  debug_viz=False,
                  max_debug_images=2,
-                 debug_image_interval=10):
+                 debug_image_interval=10,
+                 debug_image_step=0):
         # Prepare log directory. exist_ok=True avoids a TOCTOU race when several
         # torchrun ranks check + create concurrently.
         os.makedirs(output_dir, exist_ok=True)
@@ -114,7 +115,8 @@ class ResidualPPOTrainer:
 
         # Init debug images directory and counter. Independent of `debug_viz`
         # (which controls action-arrow visualization); debug image saving is
-        # gated by `max_debug_images` (None/0 = disabled) and `debug_image_interval`.
+        # gated by `max_debug_images` (None/0 = disabled), `debug_image_interval`,
+        # and `debug_image_step`.
         self.debug_images_dir = os.path.join(output_dir, 'debug_images')
         if not os.path.exists(self.debug_images_dir):
             os.makedirs(self.debug_images_dir, exist_ok=True)
@@ -123,8 +125,9 @@ class ResidualPPOTrainer:
         # each grid is comprised of 8 images, and so for 64 envs, there would be
         # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
         self.max_debug_images = max_debug_images
-        # Save images every `debug_image_interval` rollout steps.
+        # Save one rollout step every `debug_image_interval` iterations.
         self.debug_image_interval = debug_image_interval
+        self.debug_image_step = debug_image_step
 
         self.env.reset()
 
@@ -599,7 +602,12 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            if self.debug_image_interval <= 0 or step % self.debug_image_interval != 0:
+            # Only save one rollout step to avoid too many files.
+            if step != self.debug_image_step:
+                return
+
+            # Only save images at specified iteration intervals.
+            if self.debug_image_interval <= 0 or iteration % self.debug_image_interval != 0:
                 return
 
             camera_rgb = obs_dict["policy"]["camera_rgb_img"]
@@ -755,29 +763,9 @@ class ResidualPPOTrainer:
                 metadata_file.write(
                     f"render_product_path: {getattr(viewport, 'render_product_path', '')}\n")
                 metadata_file.write(f"resolution: {getattr(viewport, 'resolution', '')}\n")
-                self._write_debug_viewport_pose_metadata(metadata_file, viewport)
 
         except Exception as exc:    # pylint: disable=broad-except
             print(f"Warning: Failed to save Kit viewport debug image: {type(exc).__name__}: {exc}")
-
-    def _write_debug_viewport_pose_metadata(self, metadata_file, viewport):
-        try:
-            import omni.usd    # pylint: disable=import-outside-toplevel
-            from pxr import UsdGeom    # pylint: disable=import-outside-toplevel
-
-            stage = omni.usd.get_context().get_stage()
-            camera_prim = stage.GetPrimAtPath(str(viewport.camera_path)) if stage else None
-            if camera_prim and camera_prim.IsValid():
-                transform = UsdGeom.XformCache().GetLocalToWorldTransform(camera_prim)
-                metadata_file.write(f"camera_world_transform: {transform}\n")
-
-            robot = self.env.unwrapped.scene["robot"]
-            root_pos = robot.data.root_pos_w[0].detach().cpu().numpy().tolist()
-            root_quat = robot.data.root_quat_w[0].detach().cpu().numpy().tolist()
-            metadata_file.write(f"robot_root_pos_w: {root_pos}\n")
-            metadata_file.write(f"robot_root_quat_w: {root_quat}\n")
-        except Exception as exc:    # pylint: disable=broad-except
-            metadata_file.write(f"pose_metadata_error: {type(exc).__name__}: {exc}\n")
 
     def _create_image_grid(self, images, subtitles, iteration, step, grid_idx=0):
         """Create and save a grid of images. Returns the filepath of the saved image."""

@@ -21,6 +21,49 @@ import gymnasium as gym
 
 from isaaclab.app import AppLauncher
 
+from compass.utils.nurec_utils import (
+    PARTICLE_SPG_RUNTIME_USD_FILE,
+    apply_nurec_spg_kit_args,
+    configure_nurec_kit_viewport,
+)
+
+KIT_PERSPECTIVE_CAMERA_PATH = "/OmniverseKit_Persp"
+KIT_SCENE_PARTITION = "env_0"
+KIT_VIEWER_EYE = (1.75, -1.5, 2.2)
+KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
+
+
+def _append_visualizer_cfg(env_cfg, visualizer_cfg):
+    existing_cfgs = env_cfg.sim.visualizer_cfgs
+    if existing_cfgs is None:
+        env_cfg.sim.visualizer_cfgs = [visualizer_cfg]
+    elif isinstance(existing_cfgs, list):
+        env_cfg.sim.visualizer_cfgs.append(visualizer_cfg)
+    else:
+        env_cfg.sim.visualizer_cfgs = [existing_cfgs, visualizer_cfg]
+
+
+def _configure_legacy_viewer(env_cfg):
+    env_cfg.viewer.origin_type = 'asset_root'
+    env_cfg.viewer.asset_name = 'robot'
+    env_cfg.viewer.env_index = 0
+    env_cfg.viewer.cam_prim_path = KIT_PERSPECTIVE_CAMERA_PATH
+    env_cfg.viewer.eye = KIT_VIEWER_EYE
+    env_cfg.viewer.lookat = KIT_VIEWER_LOOKAT
+
+
+def _configure_kit_visualizer(env_cfg):
+    from isaaclab_visualizers.kit import KitVisualizerCfg
+
+    kit_viz_cfg = KitVisualizerCfg()
+    kit_viz_cfg.eye = KIT_VIEWER_EYE
+    kit_viz_cfg.lookat = KIT_VIEWER_LOOKAT
+    kit_viz_cfg.origin_type = "asset"
+    kit_viz_cfg.origin_track_path = "robot"
+    kit_viz_cfg.origin_env_index = 0
+    _append_visualizer_cfg(env_cfg, kit_viz_cfg)
+
+
 # add argparse arguments
 parser = argparse.ArgumentParser(description="COMPASS Mobility Generalist.")
 parser.add_argument('--config-files',
@@ -88,6 +131,23 @@ parser.add_argument("--camera_sensor_name",
 # Optional parameters to override gin config.
 parser.add_argument('--embodiment', type=str, help='Embodiment type')
 parser.add_argument('--environment', type=str, help='Environment type')
+parser.add_argument('--nurec-usd-file',
+                    '--nurec_usd_file',
+                    dest='nurec_usd_file',
+                    type=str,
+                    default=PARTICLE_SPG_RUNTIME_USD_FILE,
+                    help='NuRec USD filename under the selected environment folder.')
+parser.add_argument('--spg-runtime',
+                    '--spg_runtime',
+                    dest='spg_runtime',
+                    action='store_true',
+                    default=True,
+                    help='Add SPG runtime Kit args before Isaac Sim starts.')
+parser.add_argument('--no-spg-runtime',
+                    '--no_spg_runtime',
+                    dest='spg_runtime',
+                    action='store_false',
+                    help='Disable SPG runtime Kit args.')
 parser.add_argument('--num_envs', type=int, help='Number of environments')
 parser.add_argument('--precompute_valid_poses',
                     action='store_true',
@@ -115,6 +175,7 @@ AppLauncher.add_app_launcher_args(parser)
 
 # Parse the arguments
 args_cli = parser.parse_args()
+apply_nurec_spg_kit_args(args_cli)
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli, enable_cameras=True)
@@ -131,6 +192,7 @@ from mobility_es.config.h1_env_cfg import H1GoalReachingEnvCfg
 from mobility_es.config.spot_env_cfg import SpotGoalReachingEnvCfg
 from mobility_es.config.g1_env_cfg import G1GoalReachingEnvCfg
 from mobility_es.config.digit_env_cfg import DigitGoalReachingEnvCfg
+from mobility_es.config.nurec_scenes import make_nurec_scene_asset_cfg_map
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper
 
 from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
@@ -180,15 +242,8 @@ EnvSceneAssetCfgMap = {
     'hospital': environments.hospital,
     'warehouse_multi_rack': environments.warehouse_multi_rack,
 }
-# Register all NuRec Real2Sim scenes (keyed by their ``--environment`` alias).
-EnvSceneAssetCfgMap.update(environments.nurec_envs)
-
-KIT_PERSPECTIVE_CAMERA_PATH = "/OmniverseKit_Persp"
-KIT_PPISP_RENDER_PRODUCT_PATH = "/Render/COMPASS_KitPerspective_PPISP"
-NUREC_VIEWPORT_SOURCE_RENDER_PRODUCT_PATH = "/Render/front_stereo_camera_left__0"
-KIT_SCENE_PARTITION = "env_0"
-KIT_VIEWER_EYE = (1.75, -1.5, 2.2)
-KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
+NurecSceneAssetCfgMap = make_nurec_scene_asset_cfg_map(args_cli.nurec_usd_file)
+EnvSceneAssetCfgMap.update(NurecSceneAssetCfgMap)
 
 
 def _requested_visualizers():
@@ -196,228 +251,6 @@ def _requested_visualizers():
     if isinstance(requested_viz, str):
         requested_viz = requested_viz.split(',')
     return [v.strip().lower() for v in requested_viz]
-
-
-def _append_visualizer_cfg(env_cfg, visualizer_cfg):
-    existing_cfgs = env_cfg.sim.visualizer_cfgs
-    if existing_cfgs is None:
-        env_cfg.sim.visualizer_cfgs = [visualizer_cfg]
-    elif isinstance(existing_cfgs, list):
-        env_cfg.sim.visualizer_cfgs.append(visualizer_cfg)
-    else:
-        env_cfg.sim.visualizer_cfgs = [existing_cfgs, visualizer_cfg]
-
-
-def _configure_kit_visualizer(env_cfg):
-    from isaaclab_visualizers.kit import KitVisualizerCfg
-
-    kit_viz_cfg = KitVisualizerCfg()
-    kit_viz_cfg.eye = KIT_VIEWER_EYE
-    kit_viz_cfg.lookat = KIT_VIEWER_LOOKAT
-    kit_viz_cfg.origin_type = "asset"
-    kit_viz_cfg.origin_track_path = "robot"
-    kit_viz_cfg.origin_env_index = 0
-    _append_visualizer_cfg(env_cfg, kit_viz_cfg)
-
-
-def _package_qualified_asset(package_path, asset_path):
-    if not asset_path:
-        return asset_path
-    if "[" in asset_path:
-        return asset_path
-    return f"{package_path}[{os.path.basename(asset_path)}]"
-
-
-def _format_render_product_choices(stage):
-    choices = []
-    for prim in stage.Traverse():
-        if prim.GetTypeName() != "RenderProduct":
-            continue
-        targets = prim.GetRelationship("camera").GetTargets()
-        camera_path = str(targets[0]) if targets else "<no camera target>"
-        choices.append(f"{prim.GetPath()} -> {camera_path}")
-    return "\n".join(f"  {choice}" for choice in sorted(choices)) or "  <none>"
-
-
-def _copy_source_ppisp_render_product(stage, source_usd_path):
-    from pxr import Sdf, Usd
-
-    source_stage = Usd.Stage.Open(source_usd_path)
-    if source_stage is None:
-        raise RuntimeError(f"Could not open NuRec USD: {source_usd_path}")
-
-    source_rp_path = NUREC_VIEWPORT_SOURCE_RENDER_PRODUCT_PATH
-    source_rp_prim = source_stage.GetPrimAtPath(source_rp_path)
-    if not source_rp_prim or not source_rp_prim.IsValid():
-        raise RuntimeError(
-            f"NuRec viewport RenderProduct does not exist in {source_usd_path}: "
-            f"{source_rp_path}\nAvailable RenderProducts:\n"
-            f"{_format_render_product_choices(source_stage)}")
-    if source_rp_prim.GetTypeName() != "RenderProduct":
-        raise RuntimeError(
-            f"NuRec viewport path is not a RenderProduct in {source_usd_path}: "
-            f"{source_rp_path} (type={source_rp_prim.GetTypeName()!r})")
-
-    prim_stack = source_rp_prim.GetPrimStack()
-    if not prim_stack:
-        raise RuntimeError(f"PPISP RenderProduct has empty prim stack: {source_rp_path}")
-
-    source_layer = prim_stack[0].layer
-    session = stage.GetSessionLayer()
-    src_path = Sdf.Path(source_rp_path)
-    dst_path = Sdf.Path(KIT_PPISP_RENDER_PRODUCT_PATH)
-    package_path = source_stage.GetRootLayer().identifier
-
-    with Usd.EditContext(stage, session):
-        if stage.GetPrimAtPath(KIT_PPISP_RENDER_PRODUCT_PATH).IsValid():
-            stage.RemovePrim(dst_path)
-
-    # Clone the NuRec camera PPISP graph for the GUI viewport. Binding the
-    # authored robot-camera RenderProduct directly would switch the viewport to
-    # that camera, or mutate the sensor RenderProduct used by observations.
-    Sdf.CreatePrimInLayer(session, dst_path)
-    Sdf.CopySpec(source_layer, src_path, session, dst_path)
-
-    with Usd.EditContext(stage, session):
-        dst_prim = stage.GetPrimAtPath(KIT_PPISP_RENDER_PRODUCT_PATH)
-        for prim in Usd.PrimRange(dst_prim):
-            for attr in prim.GetAttributes():
-                connections = attr.GetConnections()
-                remapped = [conn.ReplacePrefix(src_path, dst_path) for conn in connections]
-                if remapped != connections:
-                    attr.SetConnections(remapped)
-                value = attr.Get()
-                if isinstance(value, Sdf.AssetPath):
-                    attr.Set(Sdf.AssetPath(_package_qualified_asset(package_path, value.path)))
-            for rel in prim.GetRelationships():
-                targets = rel.GetTargets()
-                remapped = [target.ReplacePrefix(src_path, dst_path) for target in targets]
-                if remapped != targets:
-                    rel.SetTargets(remapped)
-
-            spec = session.GetPrimAtPath(prim.GetPath())
-            if spec and spec.referenceList.prependedItems:
-                spec.referenceList.prependedItems = [
-                    Sdf.Reference(_package_qualified_asset(package_path, ref.assetPath))
-                    for ref in spec.referenceList.prependedItems
-                ]
-
-        dst_prim.GetRelationship("camera").SetTargets([Sdf.Path(KIT_PERSPECTIVE_CAMERA_PATH)])
-
-    return KIT_PPISP_RENDER_PRODUCT_PATH, source_stage
-
-
-def _apply_render_settings_from_stage(source_stage):
-    import carb.settings
-
-    layer_data = source_stage.GetRootLayer().customLayerData or {}
-    render_settings = layer_data.get("renderSettings") or {}
-    if not render_settings:
-        return
-
-    settings = carb.settings.get_settings()
-    for key, value in render_settings.items():
-        settings.set("/" + str(key).replace(":", "/"), value)
-
-
-def _apply_nurec_identity_exposure_to_camera(stage, camera_path):
-    from pxr import Sdf, Usd
-
-    camera_prim = stage.GetPrimAtPath(camera_path)
-    if not camera_prim or not camera_prim.IsValid() or camera_prim.GetTypeName() != "Camera":
-        return
-
-    identity_exposure = {
-        "exposure": 0.0,
-        "exposure:fStop": 1.0,
-        "exposure:iso": 0.0,
-        "exposure:responsivity": 1.0,
-        "exposure:time": 1.0,
-    }
-
-    with Usd.EditContext(stage, stage.GetSessionLayer()):
-        camera_prim.AddAppliedSchema("OmniRtxCameraAutoExposureAPI_1")
-        camera_prim.AddAppliedSchema("OmniRtxCameraExposureAPI_1")
-        for name, value in identity_exposure.items():
-            camera_prim.CreateAttribute(name, Sdf.ValueTypeNames.Float).Set(value)
-        camera_prim.CreateAttribute(
-            "omni:rtx:autoExposure:enabled", Sdf.ValueTypeNames.Bool).Set(False)
-
-
-def _bind_nurec_ppisp_render_product(stage, viewport, nurec_usd_path, quiet=False):
-    if not nurec_usd_path:
-        return None
-
-    try:
-        render_product_path, source_stage = _copy_source_ppisp_render_product(stage, nurec_usd_path)
-        _apply_nurec_identity_exposure_to_camera(stage, KIT_PERSPECTIVE_CAMERA_PATH)
-        viewport.render_product_path = render_product_path
-        if str(getattr(viewport, "render_product_path", "")) != render_product_path:
-            if not quiet:
-                print(
-                    f"[WARN] Kit ignored NuRec PPISP RenderProduct "
-                    f"{render_product_path}; keeping default viewport render product.")
-            return None
-
-        _apply_render_settings_from_stage(source_stage)
-        return render_product_path
-    except Exception as exc:    # pylint: disable=broad-except
-        if not quiet:
-            print(f"[WARN] Could not bind NuRec PPISP RenderProduct: {type(exc).__name__}: {exc}")
-        return None
-
-
-def _set_kit_camera_scene_partition(nurec_usd_path=None, quiet=False):
-    try:
-        import omni.kit.viewport.utility as viewport_utils
-        import omni.usd
-        from pxr import Sdf
-    except ImportError as exc:
-        if not quiet:
-            print(f"[WARN] Could not import USD utilities for Kit camera setup: {exc}")
-        return
-
-    stage = omni.usd.get_context().get_stage()
-    if stage is None:
-        if not quiet:
-            print("[WARN] Could not configure Kit camera: no active USD stage.")
-        return
-
-    camera_prim = stage.GetPrimAtPath(KIT_PERSPECTIVE_CAMERA_PATH)
-    if not camera_prim or not camera_prim.IsValid():
-        if not quiet:
-            print(
-                f"[WARN] Could not configure Kit camera: "
-                f"{KIT_PERSPECTIVE_CAMERA_PATH} does not exist.")
-        return
-
-    attr = camera_prim.GetAttribute("omni:scenePartition")
-    if not attr.IsValid():
-        attr = camera_prim.CreateAttribute("omni:scenePartition", Sdf.ValueTypeNames.Token)
-    attr.Set(KIT_SCENE_PARTITION)
-
-    render_product_path = None
-    viewport = viewport_utils.get_active_viewport()
-    if viewport is not None:
-        try:
-            viewport.camera_path = Sdf.Path(KIT_PERSPECTIVE_CAMERA_PATH)
-        except Exception:    # pylint: disable=broad-except
-            pass
-        bound_nurec_rp_path = _bind_nurec_ppisp_render_product(
-            stage, viewport, nurec_usd_path, quiet=quiet)
-        render_product_path = getattr(viewport, "render_product_path", None)
-    else:
-        bound_nurec_rp_path = None
-
-    if not quiet:
-        message = (
-            f"[INFO] Set {KIT_PERSPECTIVE_CAMERA_PATH} scene partition to "
-            f"{KIT_SCENE_PARTITION}.")
-        if bound_nurec_rp_path:
-            message += f" Bound NuRec PPISP RenderProduct: {bound_nurec_rp_path}."
-        if render_product_path:
-            message += f" Active Kit render product: {render_product_path}."
-        print(message)
 
 
 def gin_config_to_dictionary(gin_config):
@@ -445,7 +278,9 @@ def run(run_mode,
         start_pose_collision_distance=0.75,
         precompute_valid_poses=False,
         precompute_valid_orientations=False,
-        disable_terrain=False):
+        disable_terrain=False,
+        render_interval=None,
+        num_rerenders_on_reset=None):
 
     # Multi-GPU distributed setup. With `--distributed`, AppLauncher (already invoked
     # at module load) reads LOCAL_RANK / RANK / WORLD_SIZE from torchrun's env, sets
@@ -515,14 +350,14 @@ def run(run_mode,
     else:
         raise ValueError(f'Unsupported embodiment type: {embodiment}')
 
-    # Setup environment scene.
-    if environment in EnvSceneAssetCfgMap:
-        env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
-    else:
+    if environment not in EnvSceneAssetCfgMap:
         raise ValueError(f'Unsupported environment type: {environment}')
-    nurec_usd_path = None
-    if environment in environments.nurec_envs:
-        nurec_usd_path = getattr(env_cfg.scene.environment.spawn, "usd_path", None)
+    env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
+    is_nurec_scene = environment in NurecSceneAssetCfgMap
+    if render_interval is not None:
+        env_cfg.sim.render_interval = render_interval
+    if num_rerenders_on_reset is not None:
+        env_cfg.num_rerenders_on_reset = num_rerenders_on_reset
     env_cfg.scene.replicate_physics = env_cfg.scene.environment.replicate_physics
     env_cfg.scene.env_spacing = env_cfg.scene.environment.env_spacing
     env_cfg.scene.num_envs = num_envs
@@ -540,14 +375,7 @@ def run(run_mode,
     else:
         env_cfg.curriculum = None
 
-    # Keep the legacy ViewerCfg aligned with the Kit visualizer camera. Isaac Lab 3
-    # drives Kit through KitVisualizerCfg, but some env UI code still reads ViewerCfg.
-    env_cfg.viewer.origin_type = 'asset_root'
-    env_cfg.viewer.asset_name = 'robot'
-    env_cfg.viewer.env_index = 0
-    env_cfg.viewer.cam_prim_path = KIT_PERSPECTIVE_CAMERA_PATH
-    env_cfg.viewer.eye = KIT_VIEWER_EYE
-    env_cfg.viewer.lookat = KIT_VIEWER_LOOKAT
+    _configure_legacy_viewer(env_cfg)
 
     # Newton visualizer camera (new Visualizers API). Newton reads its camera from
     # sim.visualizer_cfgs, not ViewerCfg. Kit also uses visualizer_cfgs in Isaac Lab 3,
@@ -600,8 +428,9 @@ def run(run_mode,
                          render_mode="rgb_array" if record_video else None,
                          precompute_valid_poses=precompute_flag,
                          precompute_valid_orientations=precompute_orientations_flag)
-    if 'kit' in _requested_viz:
-        _set_kit_camera_scene_partition(nurec_usd_path=nurec_usd_path)
+    if is_nurec_scene and 'kit' in _requested_viz:
+        configure_nurec_kit_viewport(nurec_usd_path=env_cfg.scene.environment.spawn.usd_path,
+                                     spg_runtime=args_cli.spg_runtime)
 
     # Precompute valid pose locations if requested
     if precompute_flag and env.collision_checker.is_initialized():

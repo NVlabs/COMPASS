@@ -12,8 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Custom video recorder that records from multiple cameras."""
+# pylint: disable=line-too-long,redefined-outer-name,broad-exception-caught
+# pylint: disable=import-outside-toplevel,reimported,missing-type-doc
+# pylint: disable=subprocess-run-check,bare-except,possibly-unused-variable
 
 import os
 import time
@@ -112,7 +114,7 @@ class MultiCameraVideoRecorder(gym.Wrapper):
         self.robot_camera_frames: list = []
         self.video_index = 0
         self.recording_start_step = 0
-        self.previous_recording_start_step = None  # Track previous recording to combine when next starts
+        self.previous_recording_start_step = None    # Track previous recording to combine when next starts
 
         # Create sub-directory for robot-camera output
         self.robot_camera_folder = os.path.join(video_folder, "robot_camera")
@@ -226,7 +228,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             import time
 
             # Get existing videos before waiting
-            existing_videos_before = set(glob.glob(os.path.join(self.video_folder, "rl-video-step-*.mp4")))
+            existing_videos_before = set(
+                glob.glob(os.path.join(self.video_folder, "rl-video-step-*.mp4")))
 
             # Wait for RecordVideo to write the previous video (it writes when next recording starts)
             time.sleep(0.5)
@@ -314,7 +317,7 @@ class MultiCameraVideoRecorder(gym.Wrapper):
                 frame = rgb_data[0]
             else:
                 if not isinstance(rgb_data, torch.Tensor):
-                    rgb_data = wp.to_torch(rgb_data)  # Warp array -> torch
+                    rgb_data = wp.to_torch(rgb_data)    # Warp array -> torch
                 frame = rgb_data[0].detach().cpu().numpy()
 
             # Normalise to uint8.
@@ -326,12 +329,10 @@ class MultiCameraVideoRecorder(gym.Wrapper):
 
             self.robot_camera_frames.append(frame)
 
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:    # pylint: disable=broad-except
             if self.recorded_steps == 0:
-                print(
-                    f"[MultiCameraVideoRecorder][ERROR] Failed to record robot "
-                    f"camera frame: {type(exc).__name__}: {exc}"
-                )
+                print(f"[MultiCameraVideoRecorder][ERROR] Failed to record robot "
+                      f"camera frame: {type(exc).__name__}: {exc}")
                 traceback.print_exc()
 
     def _save_robot_camera_video(self):
@@ -349,10 +350,13 @@ class MultiCameraVideoRecorder(gym.Wrapper):
 
         # Save robot camera video
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        robot_writer = cv2.VideoWriter(robot_video_path, fourcc, self.fps, (robot_width, robot_height))
+        robot_writer = cv2.VideoWriter(robot_video_path, fourcc, self.fps,
+                                       (robot_width, robot_height))
 
         if not robot_writer.isOpened():
-            print(f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {robot_video_path}")
+            print(
+                f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {robot_video_path}"
+            )
             return
 
         for frame in self.robot_camera_frames:
@@ -379,7 +383,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
         video_filename = f"rl-video-step-{step}.mp4"
         robot_video_path = os.path.abspath(os.path.join(self.robot_camera_folder, video_filename))
         viewport_video_path = os.path.abspath(os.path.join(self.video_folder, video_filename))
-        combined_video_path = os.path.abspath(os.path.join(self.video_folder, f"combined-{video_filename}"))
+        combined_video_path = os.path.abspath(
+            os.path.join(self.video_folder, f"combined-{video_filename}"))
 
         # Check if combined video already exists
         if os.path.exists(combined_video_path):
@@ -414,7 +419,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
                 if not os.path.exists(robot_video_path):
                     return
 
-                self._combine_videos_side_by_side(viewport_video_path, robot_video_path, combined_video_path)
+                self._combine_videos_side_by_side(viewport_video_path, robot_video_path,
+                                                  combined_video_path)
 
                 # Verify combined video was created successfully before deleting robot video
                 if os.path.exists(combined_video_path) and os.path.getsize(combined_video_path) > 0:
@@ -439,7 +445,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
         video_filename = f"rl-video-step-{self.previous_recording_start_step}.mp4"
         robot_video_path = os.path.abspath(os.path.join(self.robot_camera_folder, video_filename))
         viewport_video_path = os.path.abspath(os.path.join(self.video_folder, video_filename))
-        combined_video_path = os.path.abspath(os.path.join(self.video_folder, f"combined-{video_filename}"))
+        combined_video_path = os.path.abspath(
+            os.path.join(self.video_folder, f"combined-{video_filename}"))
 
         # Check if combined video already exists (avoid re-combining)
         if os.path.exists(combined_video_path):
@@ -479,7 +486,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
                 return
 
             try:
-                self._combine_videos_side_by_side(actual_viewport_path, robot_video_path, combined_video_path)
+                self._combine_videos_side_by_side(actual_viewport_path, robot_video_path,
+                                                  combined_video_path)
 
                 # Verify combined video was created successfully before deleting robot video
                 if os.path.exists(combined_video_path) and os.path.getsize(combined_video_path) > 0:
@@ -513,11 +521,15 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             robot_cap = cv2.VideoCapture(robot_path)
 
             if not viewport_cap.isOpened():
-                print(f"[MultiCameraVideoRecorder][ERROR] Could not open viewport video: {viewport_path}")
+                print(
+                    f"[MultiCameraVideoRecorder][ERROR] Could not open viewport video: {viewport_path}"
+                )
                 return
 
             if not robot_cap.isOpened():
-                print(f"[MultiCameraVideoRecorder][ERROR] Could not open robot camera video: {robot_path}")
+                print(
+                    f"[MultiCameraVideoRecorder][ERROR] Could not open robot camera video: {robot_path}"
+                )
                 viewport_cap.release()
                 return
 
@@ -552,12 +564,13 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             # Then re-encode with ffmpeg to H.264 for browser compatibility
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             temp_output_path = output_path.replace(".mp4", "_temp.mp4")
-            combined_writer = cv2.VideoWriter(
-                temp_output_path, fourcc, combined_fps, (combined_width, combined_height)
-            )
+            combined_writer = cv2.VideoWriter(temp_output_path, fourcc, combined_fps,
+                                              (combined_width, combined_height))
 
             if not combined_writer.isOpened():
-                print(f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {output_path}")
+                print(
+                    f"[MultiCameraVideoRecorder][ERROR] Could not open VideoWriter for {output_path}"
+                )
                 viewport_cap.release()
                 robot_cap.release()
                 return
@@ -617,10 +630,8 @@ class MultiCameraVideoRecorder(gym.Wrapper):
             combined_writer.release()
 
             if frame_count == 0:
-                print(
-                    f"[MultiCameraVideoRecorder][ERROR] No frames were combined. "
-                    f"Check if both videos have valid frames."
-                )
+                print(f"[MultiCameraVideoRecorder][ERROR] No frames were combined. "
+                      f"Check if both videos have valid frames.")
                 # Clean up empty output file
                 if os.path.exists(temp_output_path):
                     os.remove(temp_output_path)
@@ -636,48 +647,66 @@ class MultiCameraVideoRecorder(gym.Wrapper):
                         import subprocess
                         # Use ffmpeg to re-encode to H.264 (browser-compatible)
                         ffmpeg_cmd = [
-                            "ffmpeg", "-y", "-i", temp_output_path,
-                            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-                            "-c:a", "copy",  # Copy audio if present
-                            "-movflags", "+faststart",  # Enable fast start for web playback
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            temp_output_path,
+                            "-c:v",
+                            "libx264",
+                            "-preset",
+                            "medium",
+                            "-crf",
+                            "23",
+                            "-c:a",
+                            "copy",    # Copy audio if present
+                            "-movflags",
+                            "+faststart",    # Enable fast start for web playback
                             output_path
                         ]
                         result = subprocess.run(
                             ffmpeg_cmd,
                             capture_output=True,
                             text=True,
-                            timeout=300  # 5 minute timeout
+                            timeout=300    # 5 minute timeout
                         )
                         if result.returncode == 0:
                             # Remove temp file after successful re-encoding
                             if os.path.exists(temp_output_path):
                                 os.remove(temp_output_path)
-                            print(f"[MultiCameraVideoRecorder] Re-encoded combined video to H.264 for browser compatibility")
+                            print(
+                                f"[MultiCameraVideoRecorder] Re-encoded combined video to H.264 for browser compatibility"
+                            )
                         else:
-                            print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding failed: {result.stderr}")
+                            print(
+                                f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding failed: {result.stderr}"
+                            )
                             # Fallback: use temp file as final (may not be browser-compatible)
                             if os.path.exists(temp_output_path):
                                 os.rename(temp_output_path, output_path)
                     except FileNotFoundError:
-                        print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg not found, using mp4v codec (may not be browser-compatible)")
+                        print(
+                            f"[MultiCameraVideoRecorder][WARNING] ffmpeg not found, using mp4v codec (may not be browser-compatible)"
+                        )
                         # Fallback: use temp file as final
                         if os.path.exists(temp_output_path):
                             os.rename(temp_output_path, output_path)
                     except subprocess.TimeoutExpired:
-                        print(f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding timed out, using temp file")
+                        print(
+                            f"[MultiCameraVideoRecorder][WARNING] ffmpeg re-encoding timed out, using temp file"
+                        )
                         if os.path.exists(temp_output_path):
                             os.rename(temp_output_path, output_path)
                     except Exception as e:
-                        print(f"[MultiCameraVideoRecorder][WARNING] Error during ffmpeg re-encoding: {e}")
+                        print(
+                            f"[MultiCameraVideoRecorder][WARNING] Error during ffmpeg re-encoding: {e}"
+                        )
                         # Fallback: use temp file as final
                         if os.path.exists(temp_output_path):
                             os.rename(temp_output_path, output_path)
 
         except Exception as e:
-            print(
-                f"[MultiCameraVideoRecorder][ERROR] Exception in _combine_videos_side_by_side: "
-                f"{type(e).__name__}: {e}"
-            )
+            print(f"[MultiCameraVideoRecorder][ERROR] Exception in _combine_videos_side_by_side: "
+                  f"{type(e).__name__}: {e}")
             traceback.print_exc()
             # Clean up on error
             try:

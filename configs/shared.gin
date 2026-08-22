@@ -1,7 +1,6 @@
 include 'configs/x_mobility_config.gin'
 
 NUM_STEPS_PER_ITER = 256
-DEBUG_IMAGE_STEP_INTERVAL = 20
 
 # RL environment setup
 run.embodiment='g1'
@@ -10,7 +9,6 @@ run.num_steps_per_iteration=%NUM_STEPS_PER_ITER
 
 # Residual PPO Trainer
 ResidualPPOTrainer.num_steps_per_env=%NUM_STEPS_PER_ITER
-ResidualPPOTrainer.debug_image_interval=%DEBUG_IMAGE_STEP_INTERVAL
 # Options include [CriticStateDepthEncoderAssembler, CriticStateSymmetricAssembler]
 ResidualPPOTrainer.critic_state_assembler=@CriticStateSymmetricAssembler
 

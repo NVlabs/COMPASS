@@ -5,6 +5,10 @@ run.num_iterations=10
 run.num_envs=64
 run.run_mode='eval'
 run.seed = 20
+# NuRec RTX rendering benefits from rendering more frequently than policy steps.
+run.render_interval = 5
+# Extra reset rerenders give NuRec cameras time to settle after scene resets.
+run.num_rerenders_on_reset = 10
 
 # Residual PPO Trainer
 ResidualPPOTrainer.debug_viz=True

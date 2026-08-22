@@ -42,7 +42,7 @@ USD_PATHS = {
                      "../usd/simple_warehouse_no_roof/simple_warehouse_no_roof.usd"),
     'Hospital':
         f'{ISAAC_NUCLEUS_DIR}/Environments/Hospital/hospital.usd',
-    # NuRec scene entries are injected here from nurec_scenes.py (imported at end of file).
+    # NuRec scene entries are registered at runtime.
     # Example manual entry scene kept for reference.
     # 'NovaCarterGalileo_NuRec':
     #     os.path.join(os.path.dirname(__file__), "../usd/nova_carter-galileo/..."),
@@ -68,7 +68,7 @@ OMAP_PATHS = {
         os.path.join(os.path.dirname(__file__), "../usd/office/omap/occupancy_map.yaml"),
     'Hospital':
         os.path.join(os.path.dirname(__file__), "../usd/hospital/omap/occupancy_map.yaml"),
-    # NuRec scene entries are injected here from nurec_scenes.py (imported at end of file).
+    # NuRec scene entries are registered at runtime.
     # Example to show how we can define OMAP_PATHS with origin_convention
     # 'NovaCarterGalileo_NuRec':
     #     {
@@ -92,9 +92,6 @@ class EnvSceneAssetCfg(AssetBaseCfg):
     # Replicate physics in the scene.
     replicate_physics = True
 
-
-# NuRec Real2Sim scenes are defined in ``nurec_scenes.py`` and registered into
-# USD_PATHS / OMAP_PATHS / ``nurec_envs`` via a bottom-of-file import (see end of module).
 
 # Adding a USD scene with combined office, galileo lab and warehouse single rack.
 combined_single_rack = EnvSceneAssetCfg(
@@ -265,26 +262,4 @@ random_envs = EnvSceneAssetCfg(
     replicate_physics=False,
 )
 
-# NuRec scenes (incl. ``nova_carter-galileo``) are defined in nurec_scenes.py and exposed
-# via the ``nurec_envs`` dict (re-exported at the end of this file).
-
-# nova_carter_galileo_nurec_1 = EnvSceneAssetCfg(
-#     prim_path="{ENV_REGEX_NS}/NovaCarterGalileo_NuRec_1",
-#     init_state=AssetBaseCfg.InitialStateCfg(
-#         pos=(0, 0, 0.01),
-#         rot=(0.0, 0.0, 0.0, 1.0),
-#     ),
-#     spawn=sim_utils.UsdFileCfg(
-#         usd_path=USD_PATHS['NovaCarterGalileo_NuRec_1'],
-#         scale=(1.0, 1.0, 1.0),
-#         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-#             disable_gravity=None,
-#             solver_position_iteration_count=4,
-#             solver_velocity_iteration_count=1,
-#         ),
-#     ),
-#     env_spacing=500,
-# )
-
-# Register NuRec Real2Sim scenes after EnvSceneAssetCfg / USD_PATHS / OMAP_PATHS exist.
-from mobility_es.config.nurec_scenes import nurec_envs    # noqa: E402,F401  pylint: disable=wrong-import-position,unused-import,cyclic-import
+# NuRec scene cfgs are built at runtime.

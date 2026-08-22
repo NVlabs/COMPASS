@@ -93,10 +93,7 @@ nova_carter-galileo/
 ├── occupancy_map.png
 ```
 
-Scenes are registered in `mobility_es/config/nurec_scenes.py` via
-`NUREC_SCENES`. Adding a scene is one `NurecScene("<folder>", "<PrimLeaf>")`
-entry, with optional `usd_file=`, `omap_file=`, `origin_convention=`, and
-`env_spacing=` overrides.
+Scene names are listed in `compass/utils/nurec_utils.py`.
 
 Registered scenes:
 
@@ -115,15 +112,18 @@ NuRec maps use a ROS bottom-left origin convention. The registry sets this by
 default; using the wrong convention leads to bad robot spawn locations.
 ```
 
-### 6. Test the setup
+### 6. Choose a NuRec asset
 
-```bash
-cd compass/rl_env
-python scripts/play.py --visualizer kit
-cd -
-```
+Use `--nurec-usd-file <filename>` to choose a USD from the selected scene
+folder. The current workflow supports particle USD assets; volume
+assets are present in some scene folders but are not tested.
 
-### 7. Train
+| Asset | Use | Notes |
+|---|---|---|
+| `particle_spg-runtime.usdz` | Default particle USD. | Default `--spg-runtime` turns on SPG in Isaac Sim and enables the copied PPISP viewport path. |
+| `particle_sh_optimized.usdz` | Particle USD without SPG runtime. | Pass `--no-spg-runtime` to skip SPG Kit args and copied PPISP viewport exposure setup. |
+
+Default particle SPG-runtime command:
 
 ```bash
 python run.py \
@@ -136,7 +136,65 @@ python run.py \
     --video \
     --video_interval 1 \
     --visualizer kit \
-    --kit_args "--/rtx/spg/enabled=true --/omni/rtx/nre/compositing/disableNuRecPostProcessings=true --/rtx/rtpt/gaussian/skipTonemapping/enabled=false --enable omni.rtx.spg" \
+    --precompute_valid_poses
+```
+
+Reference output:
+
+| Kit viewport | Robot-camera debug grid |
+|---|---|
+| <img src="images/nurec_particle_spg_runtime_kit_viewport.jpg" alt="Particle SPG-runtime Kit viewport" height="180"> | <img src="images/nurec_particle_spg_runtime_camera_grid.png" alt="Particle SPG-runtime robot-camera debug grid" height="180"> |
+
+SH-optimized particle command:
+
+```bash
+python run.py \
+    -c configs/train_config_real2sim.gin \
+    -o <output_dir> \
+    -b ./assets/x_mobility.ckpt \
+    --embodiment <embodiment_type> \
+    --environment nova_carter-galileo \
+    --nurec-usd-file particle_sh_optimized.usdz \
+    --no-spg-runtime \
+    --num_envs 12 \
+    --video \
+    --video_interval 1 \
+    --visualizer kit \
+    --precompute_valid_poses
+```
+
+Reference output:
+
+| Kit viewport | Robot-camera debug grid |
+|---|---|
+| <img src="images/nurec_sh_optimized_kit_viewport.jpg" alt="SH-optimized Kit viewport" height="180"> | <img src="images/nurec_sh_optimized_camera_grid.png" alt="SH-optimized robot-camera debug grid" height="180"> |
+
+The Kit viewport is an extreme novel view from above the robot, so render
+quality can be lower than the onboard camera. It is only for user visualization
+and is not used for training. The robot-camera debug grid is the
+policy-observation reference used by training.
+
+### 7. Test the setup
+
+```bash
+cd compass/rl_env
+python scripts/play.py --visualizer kit
+cd -
+```
+
+### 8. Train
+
+```bash
+python run.py \
+    -c configs/train_config_real2sim.gin \
+    -o <output_dir> \
+    -b ./assets/x_mobility.ckpt \
+    --embodiment <embodiment_type> \
+    --environment nova_carter-galileo \
+    --num_envs 12 \
+    --video \
+    --video_interval 1 \
+    --visualizer kit \
     --precompute_valid_poses
 ```
 
@@ -144,14 +202,21 @@ Key options:
 
 - `<embodiment_type>`: `h1`, `spot`, `carter`, `g1`, or `digit`.
 - `--environment`: any registered NuRec scene.
+- `--nurec-usd-file`: NuRec USD filename under the selected scene folder.
+  Defaults to `particle_spg-runtime.usdz`; use
+  `--nurec-usd-file particle_sh_optimized.usdz` to swap assets.
+- `--spg-runtime` / `--no-spg-runtime`: SPG runtime Kit args are enabled by
+  default. Use `--no-spg-runtime` for `particle_sh_optimized.usdz`; this also
+  skips the copied PPISP RenderProduct/exposure setup for the Kit viewport.
 - `--num_envs 12`: conservative default; increase only after checking VRAM.
 - `--precompute_valid_poses`: recommended for constrained Real2Sim scenes.
 - With `--visualizer kit`, the GUI uses the Kit perspective camera; debug
-  images and policy observations still use the robot camera sensor. For NuRec
-  scenes, COMPASS routes that perspective camera through a copied PPISP
-  RenderProduct and applies neutral PPISP exposure to the Kit camera. Keep the
-  `--kit_args` line above so the GUI viewport loads SPG and NuRec compositing
-  before the viewport RenderProduct is created.
+  images and policy observations still use the robot camera sensor. For
+  `particle_spg-runtime.usdz`, COMPASS copies the authored NuRec PPISP
+  RenderProduct, retargets it to the chase camera, and applies NuRec identity
+  exposure. SPG runtime Kit args are enabled by default before Isaac Sim starts.
+  COMPASS uses the first RenderProduct with a camera target in the source NuRec
+  USD.
 - Debug dumps include `camera_grid_*.png` for robot-camera RGB/depth and
   `kit_viewport_*.png` plus `kit_viewport_*.png.txt` for the GUI viewport.
 
@@ -170,12 +235,13 @@ and 32 envs on 48 GB. Reduce `--num_envs` on OOM.
 ```
 
 ```{note}
-The default NuRec asset is `particle_spg-runtime.usdz`. To use `volume.usdz`,
-change `DEFAULT_USD_FILE` in `mobility_es/config/nurec_scenes.py` or override
-`usd_file=` on one `NurecScene`.
+`--nurec-usd-file` is a filename, not a full path. COMPASS resolves it under
+the selected environment folder. `particle_spg-runtime.usdz` is the best match
+for the NuRec PPISP viewport setup; `particle_sh_optimized.usdz` may render
+differently.
 ```
 
-### 8. Train on multiple GPUs
+### 9. Train on multiple GPUs
 
 ```bash
 python -m torch.distributed.run --nproc_per_node=<N> \
@@ -194,7 +260,7 @@ python -m torch.distributed.run --nproc_per_node=<N> \
 `--num_envs` is per GPU. Run headless for multi-GPU by omitting
 `--visualizer kit`. Rank 0 owns logging, checkpoints, and video.
 
-### 9. Evaluate
+### 10. Evaluate
 
 ```bash
 python run.py \
@@ -212,7 +278,7 @@ python run.py \
 
 `<path/to/residual_policy_ckpt>` is usually `<output_dir>/model_<iter>.pt`.
 
-### 10. Export and deploy
+### 11. Export and deploy
 
 ```bash
 cd <output_dir>/
@@ -231,7 +297,7 @@ python <path/to/COMPASS>/trt_conversion.py \
 Deploy through the
 [COMPASS ROS2 Deployment Guide](https://github.com/NVlabs/COMPASS/tree/main/ros2_deployment).
 
-### 11. Troubleshoot
+### 12. Troubleshoot
 
 - **Pose sampling fails:** lower collision distances, enable
   `--precompute_valid_poses`, and confirm the occupancy map exists.
@@ -329,7 +395,6 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     --video \
     --video_interval 1 \
     --visualizer kit \
-    --kit_args "--/rtx/spg/enabled=true --/omni/rtx/nre/compositing/disableNuRecPostProcessings=true --/rtx/rtpt/gaussian/skipTonemapping/enabled=false --enable omni.rtx.spg" \
     --precompute_valid_poses
 ```
 
