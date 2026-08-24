@@ -61,6 +61,9 @@ workflow:
         EMBODIMENT={{embodiment}}
         ENVIRONMENT={{environment}}
         NO_RESIDUAL={{no_residual}}
+        NUREC_SCENE="{{nurec_scene}}"
+        NUREC_REVISION="{{nurec_revision}}"
+        NUREC_USD_FILE="{{nurec_usd_file}}"
         TRAIN_CONFIG=configs/train_config.gin
         EVAL_CONFIG=configs/eval_config.gin
 
@@ -72,13 +75,16 @@ workflow:
         mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
         rm -rf groot_mobility_rl_es_usds compass_usds.zip
 
-        if [[ "$ENVIRONMENT" == "nova_carter-galileo" ]]; then
-          echo "Downloading nova_carter-galileo NuRec assets from refs/pr/34"
+        if [[ -n "$NUREC_SCENE" ]]; then
+          if [[ -z "$ENVIRONMENT" ]]; then
+            ENVIRONMENT="$NUREC_SCENE"
+          fi
+          echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
           ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
               download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
-              --revision refs/pr/34 \
+              --revision "$NUREC_REVISION" \
               --local-dir ./compass/rl_env/exts/mobility_es/mobility_es/usd \
-              --include "nova_carter-galileo/**" \
+              --include "$NUREC_SCENE/**" \
               --exclude "**/raw_images.zip"
           TRAIN_CONFIG=configs/train_config_real2sim.gin
           EVAL_CONFIG=configs/eval_config_real2sim.gin
@@ -112,8 +118,14 @@ workflow:
           TRAIN_CMD+=" --embodiment $EMBODIMENT"
         fi
 
-        if [[ -n $ENVIRONMENT ]]; then
+        if [[ -n $NUREC_SCENE ]]; then
+          TRAIN_CMD+=" --nurec-scene $NUREC_SCENE"
+        elif [[ -n $ENVIRONMENT ]]; then
           TRAIN_CMD+=" --environment $ENVIRONMENT"
+        fi
+
+        if [[ -n $NUREC_USD_FILE ]]; then
+          TRAIN_CMD+=" --nurec-usd-file $NUREC_USD_FILE"
         fi
 
         if [[ -z $NO_RESIDUAL ]]; then
@@ -141,8 +153,14 @@ workflow:
           EVAL_CMD+=" --embodiment $EMBODIMENT"
         fi
 
-        if [[ -n $ENVIRONMENT ]]; then
+        if [[ -n $NUREC_SCENE ]]; then
+          EVAL_CMD+=" --nurec-scene $NUREC_SCENE"
+        elif [[ -n $ENVIRONMENT ]]; then
           EVAL_CMD+=" --environment $ENVIRONMENT"
+        fi
+
+        if [[ -n $NUREC_USD_FILE ]]; then
+          EVAL_CMD+=" --nurec-usd-file $NUREC_USD_FILE"
         fi
 
         echo $EVAL_CMD
@@ -166,3 +184,6 @@ default-values:
   resume_ckpt_artifact: ""
   embodiment: ""
   environment: ""
+  nurec_scene: ""
+  nurec_revision: refs/pr/34
+  nurec_usd_file: ""

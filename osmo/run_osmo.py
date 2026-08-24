@@ -64,6 +64,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = Path(__file__).resolve().parent / "workflows"
+DEFAULT_NUREC_REVISION = "refs/pr/34"
 
 # subcommand -> (workflow YAML filename, Dockerfile path relative to REPO_ROOT)
 SUBCOMMAND_CONFIG = {
@@ -104,6 +105,20 @@ def parse_args():
                         action="store_true",
                         help="Interactively prompt for missing credentials.")
 
+    def add_nurec(sp):
+        sp.add_argument(
+            "--nurec-scene",
+            default="",
+            help="NuRec scene folder to download from nvidia/PhysicalAI-Robotics-NuRec. "
+            "For NuRec runs this also selects the runtime environment.")
+        sp.add_argument(
+            "--nurec-revision",
+            default=DEFAULT_NUREC_REVISION,
+            help="Git revision in nvidia/PhysicalAI-Robotics-NuRec used for NuRec assets.")
+        sp.add_argument("--nurec-usd-file",
+                        default="",
+                        help="NuRec USD filename passed to run.py. Empty uses run.py's default.")
+
     train = sub.add_parser("train", help="Submit residual RL training.")
     add_common(train)
     train.add_argument("--wandb-project",
@@ -124,6 +139,7 @@ def parse_args():
                        help="Number of GPUs (= torchrun ranks). All counts use the same "
                        "distributed workflow YAML; the trainer's distributed code paths are "
                        "world_size-aware so num_gpus=1 also works as a single-rank run.")
+    add_nurec(train)
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
@@ -145,6 +161,7 @@ def parse_args():
                      type=int,
                      default=32,
                      help="Number of Isaac Lab envs for evaluation.")
+    add_nurec(evl)
 
     rec = sub.add_parser("record", help="Submit distillation-data recording.")
     add_common(rec)
@@ -189,6 +206,12 @@ def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
     dockerfile_path = Path(dockerfile)
     if not dockerfile_path.is_absolute():
         dockerfile_path = REPO_ROOT / dockerfile_path
+    if not dockerfile_path.is_file():
+        message = f"ERROR: Dockerfile not found: {dockerfile_path}\n"
+        if "isaac-lab-3.0-ga" in dockerfile:
+            message += "Did you mean docker/Dockerfile.rl.isaaclab-3.0-ga?\n"
+        sys.stderr.write(message)
+        sys.exit(2)
     image = f"{registry_prefix.rstrip('/')}/compass_{experiment}:{uuid.uuid4().hex[:8]}"
     cmds = [
         [
@@ -213,10 +236,19 @@ def submit_workflow(yaml_path: Path, set_args: dict, dry_run: bool) -> None:
         subprocess.check_call(cmd)
 
 
+def validate_nurec_args(args) -> None:
+    if getattr(args, "nurec_scene", "") and getattr(args, "environment", ""):
+        sys.stderr.write("ERROR: pass --nurec-scene for NuRec runs, not both "
+                         "--nurec-scene and --environment. The workflow uses "
+                         "--nurec-scene as run.py's runtime environment.\n")
+        sys.exit(2)
+
+
 def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
     if args.num_gpus < 1:
         sys.stderr.write(f"ERROR: --num-gpus must be >= 1 (got {args.num_gpus}).\n")
         sys.exit(2)
+    validate_nurec_args(args)
     yaml_path = WORKFLOWS_DIR / SUBCOMMAND_CONFIG["train"][0]
     set_args = {
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
@@ -231,11 +263,15 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "no_residual": "1" if args.no_residual else "",
         "embodiment": args.embodiment,
         "environment": args.environment,
+        "nurec_scene": args.nurec_scene,
+        "nurec_revision": args.nurec_revision,
+        "nurec_usd_file": args.nurec_usd_file,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)
 
 
 def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
+    validate_nurec_args(args)
     yaml_path = WORKFLOWS_DIR / SUBCOMMAND_CONFIG["eval"][0]
     set_args = {
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
@@ -250,6 +286,9 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "no_residual": "1" if args.no_residual else "",
         "embodiment": args.embodiment,
         "environment": args.environment,
+        "nurec_scene": args.nurec_scene,
+        "nurec_revision": args.nurec_revision,
+        "nurec_usd_file": args.nurec_usd_file,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)
 

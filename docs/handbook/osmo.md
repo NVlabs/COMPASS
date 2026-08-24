@@ -82,6 +82,30 @@ python osmo/run_osmo.py eval \
     [--image <pre-built-image>]
 ```
 
+### NuRec Real2Sim
+
+For NuRec training or eval, pass the scene download arguments explicitly. The
+workflow downloads the scene from
+[`nvidia/PhysicalAI-Robotics-NuRec`](https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-NuRec),
+switches to the Real2Sim gin config, and passes `--nurec-usd-file` through to
+`run.py` alongside `--nurec-scene`.
+
+```bash
+python osmo/run_osmo.py train \
+    --experiment-name nurec-galileo \
+    --wandb-project compass-rl \
+    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --nurec-revision refs/pr/34 \
+    --nurec-usd-file particle_spg-runtime.usdz \
+    --num-envs 12
+```
+
+For NuRec jobs submitted through `run_osmo.py`, use `--nurec-scene` instead of
+`--environment`. The workflow uses that scene for both the Hugging Face download
+and the `run.py --nurec-scene` value.
+
 ### `record`
 
 ```bash

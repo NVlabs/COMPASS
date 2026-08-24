@@ -97,7 +97,7 @@ Scene names are listed in `compass/utils/nurec_utils.py`.
 
 Registered scenes:
 
-| `--environment` | Description |
+| `--nurec-scene` | Description |
 |---|---|
 | `nova_carter-galileo` | Galileo lab |
 | `nova_carter-cafe` | NVIDIA cafe |
@@ -112,7 +112,15 @@ NuRec maps use a ROS bottom-left origin convention. The registry sets this by
 default; using the wrong convention leads to bad robot spawn locations.
 ```
 
-### 6. Choose a NuRec asset
+### 6. Test the setup
+
+```bash
+cd compass/rl_env
+python scripts/play.py --visualizer kit
+cd -
+```
+
+### 7. Train
 
 Use `--nurec-usd-file <filename>` to choose a USD from the selected scene
 folder. The current workflow supports particle USD assets; volume
@@ -120,18 +128,18 @@ assets are present in some scene folders but are not tested.
 
 | Asset | Use | Notes |
 |---|---|---|
-| `particle_spg-runtime.usdz` | Default particle USD. | Default `--spg-runtime` turns on SPG in Isaac Sim and enables the copied PPISP viewport path. |
-| `particle_sh_optimized.usdz` | Particle USD without SPG runtime. | Pass `--no-spg-runtime` to skip SPG Kit args and copied PPISP viewport exposure setup. |
+| `particle_spg-runtime.usdz` | Default particle USD. | Automatically turns on SPG in Isaac Sim and enables the copied PPISP viewport path. |
+| `particle_sh_optimized.usdz` | Particle USD without SPG runtime. | SPG runtime stays off automatically; no extra flag is needed. |
 
-Default particle SPG-runtime command:
+#### Default particle SPG-runtime command:
 
 ```bash
 python run.py \
     -c configs/train_config_real2sim.gin \
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
-    --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
     --num_envs 12 \
     --video \
     --video_interval 1 \
@@ -145,17 +153,16 @@ Reference output:
 |---|---|
 | <img src="images/nurec_particle_spg_runtime_kit_viewport.jpg" alt="Particle SPG-runtime Kit viewport" height="180"> | <img src="images/nurec_particle_spg_runtime_camera_grid.png" alt="Particle SPG-runtime robot-camera debug grid" height="180"> |
 
-SH-optimized particle command:
+#### SH-optimized particle command:
 
 ```bash
 python run.py \
     -c configs/train_config_real2sim.gin \
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
-    --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
     --nurec-usd-file particle_sh_optimized.usdz \
-    --no-spg-runtime \
     --num_envs 12 \
     --video \
     --video_interval 1 \
@@ -174,49 +181,26 @@ quality can be lower than the onboard camera. It is only for user visualization
 and is not used for training. The robot-camera debug grid is the
 policy-observation reference used by training.
 
-### 7. Test the setup
-
-```bash
-cd compass/rl_env
-python scripts/play.py --visualizer kit
-cd -
-```
-
-### 8. Train
-
-```bash
-python run.py \
-    -c configs/train_config_real2sim.gin \
-    -o <output_dir> \
-    -b ./assets/x_mobility.ckpt \
-    --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
-    --num_envs 12 \
-    --video \
-    --video_interval 1 \
-    --visualizer kit \
-    --precompute_valid_poses
-```
-
 Key options:
 
 - `<embodiment_type>`: `h1`, `spot`, `carter`, `g1`, or `digit`.
-- `--environment`: any registered NuRec scene.
+- `--nurec-scene`: any registered NuRec scene. This is a NuRec-specific alias
+  for `--environment`; assets must already be installed.
 - `--nurec-usd-file`: NuRec USD filename under the selected scene folder.
   Defaults to `particle_spg-runtime.usdz`; use
   `--nurec-usd-file particle_sh_optimized.usdz` to swap assets.
-- `--spg-runtime` / `--no-spg-runtime`: SPG runtime Kit args are enabled by
-  default. Use `--no-spg-runtime` for `particle_sh_optimized.usdz`; this also
-  skips the copied PPISP RenderProduct/exposure setup for the Kit viewport.
+- `--spg-runtime`: advanced override for custom SPG-runtime USDs. Usually omit
+  it; COMPASS automatically enables SPG for `particle_spg-runtime.usdz` in
+  registered NuRec scenes and leaves it off for `particle_sh_optimized.usdz`.
 - `--num_envs 12`: conservative default; increase only after checking VRAM.
 - `--precompute_valid_poses`: recommended for constrained Real2Sim scenes.
 - With `--visualizer kit`, the GUI uses the Kit perspective camera; debug
   images and policy observations still use the robot camera sensor. For
   `particle_spg-runtime.usdz`, COMPASS copies the authored NuRec PPISP
   RenderProduct, retargets it to the chase camera, and applies NuRec identity
-  exposure. SPG runtime Kit args are enabled by default before Isaac Sim starts.
-  COMPASS uses the first RenderProduct with a camera target in the source NuRec
-  USD.
+  exposure. SPG runtime Kit args are enabled automatically for this asset
+  before Isaac Sim starts. COMPASS uses the first RenderProduct with a camera
+  target in the source NuRec USD.
 - Debug dumps include `camera_grid_*.png` for robot-camera RGB/depth and
   `kit_viewport_*.png` plus `kit_viewport_*.png.txt` for the GUI viewport.
 
@@ -234,14 +218,7 @@ particle assets use `8.5 GB + 1.0 GB × num_envs`; volume assets use
 and 32 envs on 48 GB. Reduce `--num_envs` on OOM.
 ```
 
-```{note}
-`--nurec-usd-file` is a filename, not a full path. COMPASS resolves it under
-the selected environment folder. `particle_spg-runtime.usdz` is the best match
-for the NuRec PPISP viewport setup; `particle_sh_optimized.usdz` may render
-differently.
-```
-
-### 9. Train on multiple GPUs
+### 8. Train on multiple GPUs
 
 ```bash
 python -m torch.distributed.run --nproc_per_node=<N> \
@@ -250,7 +227,7 @@ python -m torch.distributed.run --nproc_per_node=<N> \
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
     --embodiment carter \
-    --environment nova_carter-galileo \
+    --nurec-scene nova_carter-galileo \
     --num_envs <per-GPU> \
     --precompute_valid_poses \
     --video \
@@ -260,7 +237,7 @@ python -m torch.distributed.run --nproc_per_node=<N> \
 `--num_envs` is per GPU. Run headless for multi-GPU by omitting
 `--visualizer kit`. Rank 0 owns logging, checkpoints, and video.
 
-### 10. Evaluate
+### 9. Evaluate
 
 ```bash
 python run.py \
@@ -269,7 +246,7 @@ python run.py \
     -b ./assets/x_mobility.ckpt \
     -p <path/to/residual_policy_ckpt> \
     --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
+    --nurec-scene nova_carter-galileo \
     --num_envs <num_envs> \
     --video \
     --video_interval 1 \
@@ -278,7 +255,7 @@ python run.py \
 
 `<path/to/residual_policy_ckpt>` is usually `<output_dir>/model_<iter>.pt`.
 
-### 11. Export and deploy
+### 10. Export and deploy
 
 ```bash
 cd <output_dir>/
@@ -297,13 +274,58 @@ python <path/to/COMPASS>/trt_conversion.py \
 Deploy through the
 [COMPASS ROS2 Deployment Guide](https://github.com/NVlabs/COMPASS/tree/main/ros2_deployment).
 
-### 12. Troubleshoot
+## OSMO workflow
 
-- **Pose sampling fails:** lower collision distances, enable
-  `--precompute_valid_poses`, and confirm the occupancy map exists.
-- **Robot spawns outside the scene:** check the scene's origin convention.
-  NuRec scenes should use `bottom-left`.
-- **CUDA OOM:** lower `--num_envs`; NuRec scenes are memory-heavy.
+Use OSMO for cloud training or eval after the local Docker setup is working.
+Run the launcher on the host, not inside the runtime container:
+
+```bash
+export WANDB_API_KEY=<your-wandb-key>
+export HF_TOKEN=<your-hf-token>
+export COMPASS_OSMO_REGISTRY=nvcr.io/<org>/<team>
+osmo login
+```
+
+NuRec OSMO jobs download COMPASS USDs, the X-Mobility checkpoint, and the
+requested NuRec scene inside the workflow. When `--nurec-scene` is set, the
+workflow switches to the Real2Sim gin config and passes `--nurec-scene` and
+`--nurec-usd-file` to `run.py`.
+
+Training example:
+
+```bash
+python osmo/run_osmo.py train \
+    --experiment-name nurec-galileo \
+    --wandb-project <wandb-project> \
+    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --nurec-revision refs/pr/34 \
+    --nurec-usd-file particle_spg-runtime.usdz \
+    --num-envs 12 \
+    --num-gpus 8
+```
+
+Evaluation example:
+
+```bash
+python osmo/run_osmo.py eval \
+    --experiment-name nurec-galileo-eval \
+    --wandb-project <wandb-project> \
+    --checkpoint <residual-wandb-artifact> \
+    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --nurec-revision refs/pr/34 \
+    --nurec-usd-file particle_spg-runtime.usdz \
+    --num-envs 12
+```
+
+OSMO runs are headless, so they do not produce the Kit perspective viewport.
+Use W&B videos and robot-camera debug images for run inspection. Add
+`--dry-run` to inspect the generated `osmo workflow submit` command, or pass
+`--image <pre-built-image>` to skip build and push. Full reference:
+[OSMO cloud submission](../osmo.md).
 
 ## Bare-metal Isaac Lab workflow
 
@@ -390,7 +412,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
     --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
+    --nurec-scene nova_carter-galileo \
     --num_envs 12 \
     --video \
     --video_interval 1 \
@@ -398,7 +420,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     --precompute_valid_poses
 ```
 
-Use the same environment names, checkpoint layout, headless mode, and VRAM
+Use the same NuRec scene names, checkpoint layout, headless mode, and VRAM
 sizing guidance from the Docker workflow.
 
 ### 7. Train on multiple GPUs
@@ -410,7 +432,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node=<N> 
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
     --embodiment carter \
-    --environment nova_carter-galileo \
+    --nurec-scene nova_carter-galileo \
     --num_envs <per-GPU> \
     --precompute_valid_poses \
     --video \
@@ -429,7 +451,7 @@ ${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
     -b ./assets/x_mobility.ckpt \
     -p <path/to/residual_policy_ckpt> \
     --embodiment <embodiment_type> \
-    --environment nova_carter-galileo \
+    --nurec-scene nova_carter-galileo \
     --num_envs <num_envs> \
     --video \
     --video_interval 1 \
@@ -455,11 +477,14 @@ python3 <path/to/COMPASS>/trt_conversion.py \
 Deploy through the
 [COMPASS ROS2 Deployment Guide](https://github.com/NVlabs/COMPASS/tree/main/ros2_deployment).
 
-### 10. Troubleshoot
+## Troubleshooting
 
 - **Isaac Sim extension errors:** reinstall with
-  `isaacsim[all,extscache]==6.0.1`.
+  `isaacsim[all,extscache]==6.0.1`; this usually applies to bare-metal
+  installs.
 - **Pose sampling fails:** lower collision distances, enable
   `--precompute_valid_poses`, and confirm the occupancy map exists.
-- **Robot spawns outside the scene:** NuRec scenes should use `bottom-left`.
-- **CUDA OOM:** lower `--num_envs`; remember it is per GPU when distributed.
+- **Robot spawns outside the scene:** check the scene's origin convention.
+  NuRec scenes should use `bottom-left`.
+- **CUDA OOM:** lower `--num_envs`; NuRec scenes are memory-heavy, and
+  `--num_envs` is per GPU when distributed.

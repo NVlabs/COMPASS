@@ -47,7 +47,8 @@ NUREC_IDENTITY_EXPOSURE = {
 
 
 def apply_nurec_spg_kit_args(args):
-    """Prepend the SPG runtime Kit args when --spg-runtime is enabled."""
+    """Prepend SPG Kit args when the selected NuRec USD requires SPG runtime."""
+    args.spg_runtime = uses_nurec_spg_runtime(args)
     if not args.spg_runtime:
         return
 
@@ -56,6 +57,18 @@ def apply_nurec_spg_kit_args(args):
         existing_kit_args = " ".join(existing_kit_args)
     additions = [arg for arg in NUREC_SPG_RUNTIME_KIT_ARGS if arg not in existing_kit_args]
     args.kit_args = " ".join(additions + ([existing_kit_args] if existing_kit_args else []))
+
+
+def uses_nurec_spg_runtime(args):
+    """Return whether the CLI selection should enable NuRec SPG runtime."""
+    if getattr(args, "spg_runtime", False):
+        return True
+
+    if getattr(args, "environment", None) not in NUREC_SCENE_NAMES:
+        return False
+
+    usd_file = getattr(args, "nurec_usd_file", "") or ""
+    return os.path.basename(usd_file) == PARTICLE_SPG_RUNTIME_USD_FILE
 
 
 def _render_product_camera_path(render_product_prim):
