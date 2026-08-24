@@ -63,8 +63,8 @@ def collect_data(dataset_config: dict, environments: list, base_policy_path: str
                 os.makedirs(dataset_dir)
             command = [
                 f"{isaaclab_path}/isaaclab.sh", "-p", 'run.py', '-c', 'configs/record_config.gin',
-                '--enable_cameras', '-b', base_policy_path, '-p', residual_policy_path, '-o',
-                dataset_dir, '--embodiment', embodiment, '--environment', environment, '--headless'
+                '-b', base_policy_path, '-p', residual_policy_path, '-o', dataset_dir,
+                '--embodiment', embodiment, '--environment', environment, '--headless'
             ]
             run(command)
 

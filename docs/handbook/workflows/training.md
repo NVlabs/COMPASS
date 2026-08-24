@@ -10,8 +10,7 @@ language-conditioned navigation behaviour to embodiment-specific dynamics.
 python run.py \
     -c configs/train_config.gin \
     -o <output_dir> \
-    -b <path/to/x_mobility_ckpt> \
-    --enable_cameras
+    -b <path/to/x_mobility_ckpt>
 ```
 
 (Inside an [activated dev shell](../installation/docker.md), `python` already
@@ -26,7 +25,6 @@ python run.py \
     -o <output_dir> \
     -b <path/to/x_mobility_ckpt> \
     -p <path/to/residual_policy_ckpt> \
-    --enable_cameras \
     --video \
     --video_interval <video_interval>
 ```
@@ -77,7 +75,7 @@ ${ISAACLAB_PATH}/isaaclab.sh -p -m torch.distributed.run \
     run.py --distributed \
     -c configs/train_config.gin \
     -o <output_dir> -b <x_mobility_ckpt> \
-    --enable_cameras --num_envs 32
+    --num_envs 32
 ```
 
 Total parallel envs = `nproc_per_node × num_envs`. The trainer's distributed

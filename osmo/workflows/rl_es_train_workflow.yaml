@@ -58,6 +58,15 @@ workflow:
         # Generate your W&B API key: https://wandb.ai/authorize
         export WANDB_API_KEY={{wandb_api_key}}
 
+        EMBODIMENT={{embodiment}}
+        ENVIRONMENT={{environment}}
+        NO_RESIDUAL={{no_residual}}
+        NUREC_SCENE="{{nurec_scene}}"
+        NUREC_REVISION="{{nurec_revision}}"
+        NUREC_USD_FILE="{{nurec_usd_file}}"
+        TRAIN_CONFIG=configs/train_config.gin
+        EVAL_CONFIG=configs/eval_config.gin
+
         # Download and unpack the COMPASS USDs from HuggingFace.
         echo "Downloading compass_usds.zip from huggingface.co/nvidia/COMPASS"
         ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
@@ -65,6 +74,21 @@ workflow:
         unzip -q -o compass_usds.zip
         mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
         rm -rf groot_mobility_rl_es_usds compass_usds.zip
+
+        if [[ -n "$NUREC_SCENE" ]]; then
+          if [[ -z "$ENVIRONMENT" ]]; then
+            ENVIRONMENT="$NUREC_SCENE"
+          fi
+          echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
+          ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+              download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
+              --revision "$NUREC_REVISION" \
+              --local-dir ./compass/rl_env/exts/mobility_es/mobility_es/usd \
+              --include "$NUREC_SCENE/**" \
+              --exclude "**/raw_images.zip"
+          TRAIN_CONFIG=configs/train_config_real2sim.gin
+          EVAL_CONFIG=configs/eval_config_real2sim.gin
+        fi
 
         # Create directory to store the training outputs.
         OUTPUT_DIR="{{output}}/outputs"
@@ -87,21 +111,23 @@ workflow:
         # Launch training across {{num_gpus}} GPUs via torchrun. Each rank
         # spawns its own Isaac Sim instance + env; gradients sync via manual
         # all-reduce in PPO.update. Total parallel envs = {{num_gpus}} *
-        # num_envs. We pin --num_envs 32 here because the gin default of 64
-        # OOMs on L40 (48 GB) at this batch size; 32 fits comfortably.
-        TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c configs/train_config.gin --enable_cameras -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --num_envs 32"
+        # num_envs. NuRec assets are memory-heavy, so tune --num-envs per GPU.
+        TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c $TRAIN_CONFIG -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --num_envs {{num_envs}}"
 
-        EMBODIMENT={{embodiment}}
         if [[ -n $EMBODIMENT ]]; then
           TRAIN_CMD+=" --embodiment $EMBODIMENT"
         fi
 
-        ENVIRONMENT={{environment}}
-        if [[ -n $ENVIRONMENT ]]; then
+        if [[ -n $NUREC_SCENE ]]; then
+          TRAIN_CMD+=" --nurec-scene $NUREC_SCENE"
+        elif [[ -n $ENVIRONMENT ]]; then
           TRAIN_CMD+=" --environment $ENVIRONMENT"
         fi
 
-        NO_RESIDUAL={{no_residual}}
+        if [[ -n $NUREC_USD_FILE ]]; then
+          TRAIN_CMD+=" --nurec-usd-file $NUREC_USD_FILE"
+        fi
+
         if [[ -z $NO_RESIDUAL ]]; then
           TRAIN_CMD+=" -b ./model.ckpt"
         fi
@@ -118,7 +144,7 @@ workflow:
         # fine for a one-shot eval at the end of training.
         eval_ckpt=$(ls $OUTPUT_DIR/model_*.pt | sort -V | tail -n 1)
         ckpt_name=$(basename "$eval_ckpt")
-        EVAL_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c configs/eval_config.gin --enable_cameras -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --headless --video --video_interval 1"
+        EVAL_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --headless --video --video_interval 1 --num_envs {{num_envs}}"
         if [[ -z $NO_RESIDUAL ]]; then
           EVAL_CMD+=" -b ./model.ckpt"
         fi
@@ -127,8 +153,14 @@ workflow:
           EVAL_CMD+=" --embodiment $EMBODIMENT"
         fi
 
-        if [[ -n $ENVIRONMENT ]]; then
+        if [[ -n $NUREC_SCENE ]]; then
+          EVAL_CMD+=" --nurec-scene $NUREC_SCENE"
+        elif [[ -n $ENVIRONMENT ]]; then
           EVAL_CMD+=" --environment $ENVIRONMENT"
+        fi
+
+        if [[ -n $NUREC_USD_FILE ]]; then
+          EVAL_CMD+=" --nurec-usd-file $NUREC_USD_FILE"
         fi
 
         echo $EVAL_CMD
@@ -147,7 +179,11 @@ default-values:
   image: ""
   workflow_name: compass_rl_es_train
   num_gpus: 8
+  num_envs: 32
   no_residual: ""
   resume_ckpt_artifact: ""
   embodiment: ""
   environment: ""
+  nurec_scene: ""
+  nurec_revision: refs/pr/34
+  nurec_usd_file: ""

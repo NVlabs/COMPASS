@@ -45,6 +45,14 @@ workflow:
         # Generate your W&B API key: https://wandb.ai/authorize
         export WANDB_API_KEY={{wandb_api_key}}
 
+        EMBODIMENT={{embodiment}}
+        ENVIRONMENT={{environment}}
+        NO_RESIDUAL={{no_residual}}
+        NUREC_SCENE="{{nurec_scene}}"
+        NUREC_REVISION="{{nurec_revision}}"
+        NUREC_USD_FILE="{{nurec_usd_file}}"
+        EVAL_CONFIG=configs/eval_config.gin
+
         # Download and unpack the COMPASS USDs from HuggingFace.
         echo "Downloading compass_usds.zip from huggingface.co/nvidia/COMPASS"
         ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
@@ -52,6 +60,20 @@ workflow:
         unzip -q -o compass_usds.zip
         mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
         rm -rf groot_mobility_rl_es_usds compass_usds.zip
+
+        if [[ -n "$NUREC_SCENE" ]]; then
+          if [[ -z "$ENVIRONMENT" ]]; then
+            ENVIRONMENT="$NUREC_SCENE"
+          fi
+          echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
+          ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+              download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
+              --revision "$NUREC_REVISION" \
+              --local-dir ./compass/rl_env/exts/mobility_es/mobility_es/usd \
+              --include "$NUREC_SCENE/**" \
+              --exclude "**/raw_images.zip"
+          EVAL_CONFIG=configs/eval_config_real2sim.gin
+        fi
 
         # Create directory to store the training outputs.
         OUTPUT_DIR="{{output}}/outputs"
@@ -77,23 +99,26 @@ workflow:
         fi
 
         # Launch evaluation.
-        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c configs/eval_config.gin --enable_cameras -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --video_interval 1"
+        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --video_interval 1 --num_envs {{num_envs}}"
 
-        EMBODIMENT={{embodiment}}
         if [[ -n $EMBODIMENT ]]; then
             CMD+=" --embodiment $EMBODIMENT"
         fi
 
-        ENVIRONMENT={{environment}}
-        if [[ -n $ENVIRONMENT ]]; then
+        if [[ -n $NUREC_SCENE ]]; then
+            CMD+=" --nurec-scene $NUREC_SCENE"
+        elif [[ -n $ENVIRONMENT ]]; then
             CMD+=" --environment $ENVIRONMENT"
+        fi
+
+        if [[ -n $NUREC_USD_FILE ]]; then
+            CMD+=" --nurec-usd-file $NUREC_USD_FILE"
         fi
 
         if [[ -n $DESTILLATION_CKPT_ARTIFACT ]]; then
             CMD+=" -d $DESTILLATION_CKPT"
         fi
 
-        NO_RESIDUAL={{no_residual}}
         if [[ -z $NO_RESIDUAL ]]; then
             CMD+=" -b ./base_policy/model.ckpt"
         fi
@@ -113,7 +138,11 @@ workflow:
 default-values:
   image: ""
   workflow_name: compass_rl_es
+  num_envs: 32
   no_residual: ""
   distillation_ckpt_artifact: ""
   embodiment: ""
   environment: ""
+  nurec_scene: ""
+  nurec_revision: refs/pr/34
+  nurec_usd_file: ""

@@ -81,9 +81,8 @@ def reset_root_state_uniform_collision_free(env: RLESEnvWrapper,
 
         # Try to use orientation-aware sampling if available and enabled
         use_precomputed_orientations = False
-        if (hasattr(env, 'precompute_valid_orientations') and
-            env.precompute_valid_orientations and
-            hasattr(env.collision_checker, 'sample_start_pose_with_orientation')):
+        if (hasattr(env, 'precompute_valid_orientations') and env.precompute_valid_orientations
+                and hasattr(env.collision_checker, 'sample_start_pose_with_orientation')):
             try:
                 sampled_positions_2d, sampled_yaws = (
                     env.collision_checker.sample_start_pose_with_orientation(

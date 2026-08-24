@@ -6,7 +6,9 @@
 #
 # Usage:
 #   ./docker/run.sh build [tag]               # build the image (default tag: latest)
+#   COMPASS_DOCKERFILE=docker/Dockerfile.rl.isaaclab-3.0-ga ./docker/run.sh build isaaclab-3.0-ga
 #   ./docker/run.sh assets [--hf-token TOK]   # download USDs + X-Mobility ckpt to ./assets
+#                         [--nurec-scene SCENE]  # also download a NuRec scene folder
 #   ./docker/run.sh up                        # idempotent: start daemon container if not running
 #   ./docker/run.sh down                      # docker rm -f the container
 #   ./docker/run.sh exec <cmd> [...]          # one-shot exec inside the running container
@@ -23,6 +25,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Image tag. Override via `./docker/run.sh build mytag` then `COMPASS_IMAGE_TAG=mytag ./docker/run.sh up`.
 IMAGE_TAG="${COMPASS_IMAGE_TAG:-latest}"
 IMAGE_NAME="compass-rl:${IMAGE_TAG}"
+DOCKERFILE="${COMPASS_DOCKERFILE:-docker/Dockerfile.rl}"
 
 # Container name = "compass-<user>-<8-hex of repo path>". Hashing the absolute repo
 # path means multiple checkouts of COMPASS coexist without colliding, and the same
@@ -100,9 +103,9 @@ _compass_run_args() {
 # ──────────────────────────────────────────────────────────────────────────────
 cmd_build() {
     local tag="${1:-${IMAGE_TAG}}"
-    step "Building ${IMAGE_NAME/:*/:${tag}} from docker/Dockerfile.rl"
+    step "Building ${IMAGE_NAME/:*/:${tag}} from ${DOCKERFILE}"
     cd "${REPO_ROOT}"
-    docker build --network=host -f docker/Dockerfile.rl -t "compass-rl:${tag}" .
+    docker build --network=host -f "${DOCKERFILE}" -t "compass-rl:${tag}" .
     info "Build complete: compass-rl:${tag}"
 }
 
@@ -187,6 +190,7 @@ cmd_shell() {
 
 cmd_status() {
     echo "Image:     ${IMAGE_NAME}"
+    echo "Dockerfile:${DOCKERFILE}"
     if docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
         echo "Image OK:  $(docker image inspect "${IMAGE_NAME}" --format '{{.Id}} ({{.Created}})')"
     else
@@ -206,7 +210,7 @@ cmd_status() {
 }
 
 usage() {
-    sed -n '5,16p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    sed -n '5,18p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
     exit "${1:-0}"
 }
 

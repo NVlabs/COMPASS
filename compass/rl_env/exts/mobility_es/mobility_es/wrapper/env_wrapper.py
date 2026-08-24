@@ -24,7 +24,10 @@ class RLESEnvWrapper(ManagerBasedRLEnv):
     """Env wrapper of ManagerBasedRLEnv for RL embodiment specialist.
     """
 
-    def __init__(self, cfg: ManagerBasedRLEnvCfg, render_mode=None, precompute_valid_poses=False,
+    def __init__(self,
+                 cfg: ManagerBasedRLEnvCfg,
+                 render_mode=None,
+                 precompute_valid_poses=False,
                  precompute_valid_orientations=False):
         """
         Initializes the RLESEnvWrapper.

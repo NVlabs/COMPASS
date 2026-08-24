@@ -21,103 +21,235 @@ import gymnasium as gym
 
 from isaaclab.app import AppLauncher
 
+from compass.utils.nurec_utils import (
+    PARTICLE_SPG_RUNTIME_USD_FILE,
+    apply_nurec_spg_kit_args,
+    configure_nurec_kit_viewport,
+)
+
+KIT_PERSPECTIVE_CAMERA_PATH = "/OmniverseKit_Persp"
+KIT_SCENE_PARTITION = "env_0"
+KIT_VIEWER_EYE = (1.5, -1.5, 2.2)
+KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
+
+
+def _append_visualizer_cfg(env_cfg, visualizer_cfg):
+    existing_cfgs = env_cfg.sim.visualizer_cfgs
+    if existing_cfgs is None:
+        env_cfg.sim.visualizer_cfgs = [visualizer_cfg]
+    elif isinstance(existing_cfgs, list):
+        env_cfg.sim.visualizer_cfgs.append(visualizer_cfg)
+    else:
+        env_cfg.sim.visualizer_cfgs = [existing_cfgs, visualizer_cfg]
+
+
+def _configure_legacy_viewer(env_cfg):
+    env_cfg.viewer.origin_type = "asset_root"
+    env_cfg.viewer.asset_name = "robot"
+    env_cfg.viewer.env_index = 0
+    env_cfg.viewer.cam_prim_path = KIT_PERSPECTIVE_CAMERA_PATH
+    env_cfg.viewer.eye = KIT_VIEWER_EYE
+    env_cfg.viewer.lookat = KIT_VIEWER_LOOKAT
+
+
+def _configure_kit_visualizer(env_cfg):
+    from isaaclab_visualizers.kit import KitVisualizerCfg
+
+    kit_viz_cfg = KitVisualizerCfg()
+    kit_viz_cfg.eye = KIT_VIEWER_EYE
+    kit_viz_cfg.lookat = KIT_VIEWER_LOOKAT
+    kit_viz_cfg.origin_type = "asset"
+    kit_viz_cfg.origin_track_path = "robot"
+    kit_viz_cfg.origin_env_index = 0
+    _append_visualizer_cfg(env_cfg, kit_viz_cfg)
+
+
+def _configure_kit_scene_partition(quiet=False):
+    try:
+        import omni.usd
+        from pxr import Sdf
+    except ImportError as exc:
+        if not quiet:
+            print(f"[WARN] Could not import USD utilities for Kit viewport setup: {exc}")
+        return
+
+    stage = omni.usd.get_context().get_stage()
+    if stage is None:
+        if not quiet:
+            print("[WARN] Could not configure Kit viewport: no active USD stage.")
+        return
+
+    camera_prim = stage.GetPrimAtPath(KIT_PERSPECTIVE_CAMERA_PATH)
+    if not camera_prim or not camera_prim.IsValid():
+        if not quiet:
+            print(f"[WARN] Could not configure Kit viewport: "
+                  f"{KIT_PERSPECTIVE_CAMERA_PATH} does not exist.")
+        return
+
+    attr = camera_prim.GetAttribute("omni:scenePartition")
+    if not attr.IsValid():
+        attr = camera_prim.CreateAttribute("omni:scenePartition", Sdf.ValueTypeNames.Token)
+    attr.Set(KIT_SCENE_PARTITION)
+    if not quiet:
+        print(f"[INFO] Set {KIT_PERSPECTIVE_CAMERA_PATH} scene partition to "
+              f"{KIT_SCENE_PARTITION}.")
+
+
 # add argparse arguments
 parser = argparse.ArgumentParser(description="COMPASS Mobility Generalist.")
-parser.add_argument('--config-files',
-                    '-c',
-                    nargs='+',
+parser.add_argument(
+    "--config-files",
+    "-c",
+    nargs="+",
+    required=True,
+    help="The list of the config files.",
+)
+parser.add_argument(
+    "--base-policy-path",
+    "-b",
+    type=str,
+    default=None,
+    help="The path to the base policy checkpoint.",
+)
+parser.add_argument(
+    "--distillation-policy-path",
+    "-d",
+    type=str,
+    default=None,
+    help="The path to the distillation policy checkpoint.",
+)
+parser.add_argument(
+    "--checkpoint-path",
+    "-p",
+    type=str,
+    default=None,
+    help="The path to the checkpoint.",
+)
+parser.add_argument(
+    "--gr00t-policy",
+    action="store_true",
+    default=False,
+    help="Use gr00t policy for evaluation.",
+)
+parser.add_argument(
+    "--logger",
+    type=str,
+    choices=["wandb", "tensorboard"],
+    default="tensorboard",
+    help="Logger to use: wandb or tensorboard",
+)
+parser.add_argument(
+    "--wandb-project-name",
+    "-n",
+    type=str,
+    default="compass",
+    help="The project name of W&B (only consulted when --logger wandb).",
+)
+parser.add_argument("--wandb-run-name",
+                    "-r",
+                    type=str,
+                    default="train_run",
+                    help="The run name of W&B.")
+parser.add_argument(
+    "--wandb-entity-name",
+    "-e",
+    type=str,
+    default="nvidia-isaac",
+    help="The entity name of W&B.",
+)
+parser.add_argument("--output-dir",
+                    "-o",
+                    type=str,
                     required=True,
-                    help='The list of the config files.')
-parser.add_argument('--base-policy-path',
-                    '-b',
-                    type=str,
-                    default=None,
-                    help='The path to the base policy checkpoint.')
-parser.add_argument('--distillation-policy-path',
-                    '-d',
-                    type=str,
-                    default=None,
-                    help='The path to the distillation policy checkpoint.')
-parser.add_argument('--checkpoint-path',
-                    '-p',
-                    type=str,
-                    default=None,
-                    help='The path to the checkpoint.')
-parser.add_argument('--gr00t-policy',
-                    action='store_true',
-                    default=False,
-                    help='Use gr00t policy for evaluation.')
-parser.add_argument('--logger',
-                    type=str,
-                    choices=['wandb', 'tensorboard'],
-                    default='tensorboard',
-                    help='Logger to use: wandb or tensorboard')
-parser.add_argument('--wandb-project-name',
-                    '-n',
-                    type=str,
-                    default='compass',
-                    help='The project name of W&B (only consulted when --logger wandb).')
-parser.add_argument('--wandb-run-name',
-                    '-r',
-                    type=str,
-                    default='train_run',
-                    help='The run name of W&B.')
-parser.add_argument('--wandb-entity-name',
-                    '-e',
-                    type=str,
-                    default='nvidia-isaac',
-                    help='The entity name of W&B.')
-parser.add_argument('--output-dir',
-                    '-o',
-                    type=str,
-                    required=True,
-                    help='The path to the output dir.')
+                    help="The path to the output dir.")
 parser.add_argument("--video",
                     action="store_true",
                     default=False,
                     help="Record videos during training.")
-parser.add_argument("--video_interval",
-                    type=int,
-                    default=10,
-                    help="Interval between video recordings (in iterations).")
-parser.add_argument("--camera_sensor_name",
-                    type=str,
-                    default="camera",
-                    help="Name of the onboard camera sensor in env.scene.sensors "
-                         "used for robot-camera video recording (default: 'camera').")
+parser.add_argument(
+    "--video_interval",
+    type=int,
+    default=10,
+    help="Interval between video recordings (in iterations).",
+)
+parser.add_argument(
+    "--camera_sensor_name",
+    type=str,
+    default="camera",
+    help="Name of the onboard camera sensor in env.scene.sensors "
+    "used for robot-camera video recording (default: 'camera').",
+)
 # Optional parameters to override gin config.
-parser.add_argument('--embodiment', type=str, help='Embodiment type')
-parser.add_argument('--environment', type=str, help='Environment type')
-parser.add_argument('--num_envs', type=int, help='Number of environments')
-parser.add_argument('--precompute_valid_poses',
-                    action='store_true',
-                    default=False,
-                    help='Precompute valid pose locations for faster sampling')
-parser.add_argument('--precompute_valid_orientations',
-                    action='store_true',
-                    default=False,
-                    help='Precompute valid orientations for each pose location. '
-                         'If False, uses randomly generated orientations.')
-parser.add_argument('--disable_terrain',
-                    action='store_true',
-                    default=False,
-                    help='Disable terrain (set terrain to None).')
+parser.add_argument("--embodiment", type=str, help="Embodiment type")
+parser.add_argument("--environment", type=str, help="Environment type")
+parser.add_argument(
+    "--nurec-scene",
+    type=str,
+    help="NuRec scene to run. Alias for --environment; assets must "
+    "already be installed under the mobility_es usd directory.",
+)
+parser.add_argument(
+    "--nurec-usd-file",
+    "--nurec_usd_file",
+    dest="nurec_usd_file",
+    type=str,
+    default=PARTICLE_SPG_RUNTIME_USD_FILE,
+    help="NuRec USD filename under the selected environment folder.",
+)
+parser.add_argument(
+    "--spg-runtime",
+    "--spg_runtime",
+    dest="spg_runtime",
+    action="store_true",
+    default=False,
+    help="Force SPG runtime Kit args before Isaac Sim starts. "
+    f"This is automatic for {PARTICLE_SPG_RUNTIME_USD_FILE} "
+    "in registered NuRec scenes.",
+)
+parser.add_argument("--num_envs", type=int, help="Number of environments")
+parser.add_argument(
+    "--precompute_valid_poses",
+    action="store_true",
+    default=False,
+    help="Precompute valid pose locations for faster sampling",
+)
+parser.add_argument(
+    "--precompute_valid_orientations",
+    action="store_true",
+    default=False,
+    help="Precompute valid orientations for each pose location. "
+    "If False, uses randomly generated orientations.",
+)
+parser.add_argument(
+    "--disable_terrain",
+    action="store_true",
+    default=False,
+    help="Disable terrain (set terrain to None).",
+)
 
 # Multi-GPU training. Pair with `torchrun --nproc_per_node N run.py --distributed ...`;
 # AppLauncher consumes this to bind each rank to its own GPU.
-parser.add_argument('--distributed',
-                    action='store_true',
-                    default=False,
-                    help='Run training across multiple GPUs (one process per GPU via torchrun).')
+parser.add_argument(
+    "--distributed",
+    action="store_true",
+    default=False,
+    help="Run training across multiple GPUs (one process per GPU via torchrun).",
+)
 
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 
 # Parse the arguments
 args_cli = parser.parse_args()
+if args_cli.nurec_scene is not None:
+    if (args_cli.environment is not None and args_cli.environment != args_cli.nurec_scene):
+        parser.error("--nurec-scene and --environment select different scenes. "
+                     "For NuRec runs, pass --nurec-scene only.")
+    args_cli.environment = args_cli.nurec_scene
+apply_nurec_spg_kit_args(args_cli)
 
 # launch omniverse app
-app_launcher = AppLauncher(args_cli)
+app_launcher = AppLauncher(args_cli, enable_cameras=True)
 simulation_app = app_launcher.app
 
 import gin
@@ -131,6 +263,7 @@ from mobility_es.config.h1_env_cfg import H1GoalReachingEnvCfg
 from mobility_es.config.spot_env_cfg import SpotGoalReachingEnvCfg
 from mobility_es.config.g1_env_cfg import G1GoalReachingEnvCfg
 from mobility_es.config.digit_env_cfg import DigitGoalReachingEnvCfg
+from mobility_es.config.nurec_scenes import make_nurec_scene_asset_cfg_map
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper
 
 from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
@@ -162,26 +295,33 @@ class _NoOpLogger:
 
 # Map from the embedding type to the RL env config.
 EmbodimentEnvCfgMap = {
-    'h1': H1GoalReachingEnvCfg,
-    'spot': SpotGoalReachingEnvCfg,
-    'carter': CarterGoalReachingEnvCfg,
-    'g1': G1GoalReachingEnvCfg,
-    'digit': DigitGoalReachingEnvCfg
+    "h1": H1GoalReachingEnvCfg,
+    "spot": SpotGoalReachingEnvCfg,
+    "carter": CarterGoalReachingEnvCfg,
+    "g1": G1GoalReachingEnvCfg,
+    "digit": DigitGoalReachingEnvCfg,
 }
 
 # Map from the environment type to the env scene asset config.
 EnvSceneAssetCfgMap = {
-    'warehouse_single_rack': environments.warehouse_single_rack,
-    'galileo_lab': environments.galileo_lab,
-    'simple_office': environments.simple_office,
-    'combined_single_rack': environments.combined_single_rack,
-    'combined_multi_rack': environments.combined_multi_rack,
-    'random_envs': environments.random_envs,
-    'hospital': environments.hospital,
-    'warehouse_multi_rack': environments.warehouse_multi_rack,
+    "warehouse_single_rack": environments.warehouse_single_rack,
+    "galileo_lab": environments.galileo_lab,
+    "simple_office": environments.simple_office,
+    "combined_single_rack": environments.combined_single_rack,
+    "combined_multi_rack": environments.combined_multi_rack,
+    "random_envs": environments.random_envs,
+    "hospital": environments.hospital,
+    "warehouse_multi_rack": environments.warehouse_multi_rack,
 }
-# Register all NuRec Real2Sim scenes (keyed by their ``--environment`` alias).
-EnvSceneAssetCfgMap.update(environments.nurec_envs)
+NurecSceneAssetCfgMap = make_nurec_scene_asset_cfg_map(args_cli.nurec_usd_file)
+EnvSceneAssetCfgMap.update(NurecSceneAssetCfgMap)
+
+
+def _requested_visualizers():
+    requested_viz = getattr(args_cli, "visualizer", None) or []
+    if isinstance(requested_viz, str):
+        requested_viz = requested_viz.split(",")
+    return [v.strip().lower() for v in requested_viz]
 
 
 def gin_config_to_dictionary(gin_config):
@@ -197,19 +337,23 @@ def gin_config_to_dictionary(gin_config):
 
 
 @gin.configurable
-def run(run_mode,
-        embodiment,
-        environment,
-        num_envs,
-        num_iterations,
-        num_steps_per_iteration,
-        seed,
-        enable_curriculum=False,
-        goal_pose_collision_distance=0.5,
-        start_pose_collision_distance=0.75,
-        precompute_valid_poses=False,
-        precompute_valid_orientations=False,
-        disable_terrain=False):
+def run(
+    run_mode,
+    embodiment,
+    environment,
+    num_envs,
+    num_iterations,
+    num_steps_per_iteration,
+    seed,
+    enable_curriculum=False,
+    goal_pose_collision_distance=0.5,
+    start_pose_collision_distance=0.75,
+    precompute_valid_poses=False,
+    precompute_valid_orientations=False,
+    disable_terrain=False,
+    render_interval=None,
+    num_rerenders_on_reset=None,
+):
 
     # Multi-GPU distributed setup. With `--distributed`, AppLauncher (already invoked
     # at module load) reads LOCAL_RANK / RANK / WORLD_SIZE from torchrun's env, sets
@@ -235,17 +379,19 @@ def run(run_mode,
     else:
         local_rank = 0
         global_rank = 0
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         is_rank_zero = True
 
     # Setup logger. Only rank 0 writes TensorBoard / W&B / artifacts; other ranks get
     # a no-op logger that discards everything.
     if is_rank_zero:
-        logger = Logger(log_dir=args_cli.output_dir,
-                        backend=args_cli.logger,
-                        experiment_name=args_cli.wandb_run_name,
-                        project_name=args_cli.wandb_project_name,
-                        entity=args_cli.wandb_entity_name)
+        logger = Logger(
+            log_dir=args_cli.output_dir,
+            backend=args_cli.logger,
+            experiment_name=args_cli.wandb_run_name,
+            project_name=args_cli.wandb_project_name,
+            entity=args_cli.wandb_entity_name,
+        )
     else:
         logger = _NoOpLogger()
 
@@ -277,17 +423,20 @@ def run(run_mode,
     if embodiment in EmbodimentEnvCfgMap:
         env_cfg = EmbodimentEnvCfgMap[embodiment]()
     else:
-        raise ValueError(f'Unsupported embodiment type: {embodiment}')
+        raise ValueError(f"Unsupported embodiment type: {embodiment}")
 
-    # Setup environment scene.
-    if environment in EnvSceneAssetCfgMap:
-        env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
-    else:
-        raise ValueError(f'Unsupported environment type: {environment}')
+    if environment not in EnvSceneAssetCfgMap:
+        raise ValueError(f"Unsupported environment type: {environment}")
+    env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
+    is_nurec_scene = environment in NurecSceneAssetCfgMap
+    if render_interval is not None:
+        env_cfg.sim.render_interval = render_interval
+    if num_rerenders_on_reset is not None:
+        env_cfg.num_rerenders_on_reset = num_rerenders_on_reset
     env_cfg.scene.replicate_physics = env_cfg.scene.environment.replicate_physics
     env_cfg.scene.env_spacing = env_cfg.scene.environment.env_spacing
     env_cfg.scene.num_envs = num_envs
-    env_cfg.events.reset_base.params["pose_range"] = env_cfg.scene.environment.pose_sample_range
+    env_cfg.events.reset_base.params["pose_range"] = (env_cfg.scene.environment.pose_sample_range)
 
     # Setup terrain (disable if requested)
     if disable_terrain or args_cli.disable_terrain:
@@ -297,39 +446,29 @@ def run(run_mode,
     if enable_curriculum:
         env_cfg.curriculum.command_min_distance_prob.params[
             "num_steps_per_iteration"] = num_steps_per_iteration
-        env_cfg.curriculum.command_min_distance_prob.params["total_iterations"] = num_iterations
+        env_cfg.curriculum.command_min_distance_prob.params["total_iterations"] = (num_iterations)
     else:
         env_cfg.curriculum = None
 
-    # Setup viewer.
-    # ViewerCfg drives the RTX/Kit viewport camera (via ViewportCameraController), which
-    # follows the robot ('asset_root'). It does NOT apply to the Newton visualizer — that
-    # path is gated on Kit being present, so a `--visualizer newton` viewport is blank
-    # unless we give it a camera through sim.visualizer_cfgs (see below).
-    env_cfg.viewer.origin_type = 'asset_root'
-    env_cfg.viewer.asset_name = 'robot'
-    env_cfg.viewer.env_index = 0
-    env_cfg.viewer.eye = (-2.5, -0.5, 1.5)
+    _configure_legacy_viewer(env_cfg)
 
     # Newton visualizer camera (new Visualizers API). Newton reads its camera from
-    # sim.visualizer_cfgs, not ViewerCfg, so without this its viewport is empty. Give it a
-    # robot-following camera (tiled-cam follow is Newton's follow mechanism). Only added when
-    # '--visualizer newton' is requested; if 'kit' is also requested the simulator auto-fills
-    # the Kit default, so the RTX viewport is unaffected.
-    _requested_viz = getattr(args_cli, 'visualizer', None) or []
-    if isinstance(_requested_viz, str):
-        _requested_viz = _requested_viz.split(',')
-    _requested_viz = [v.strip().lower() for v in _requested_viz]
-    if 'newton' in _requested_viz:
+    # sim.visualizer_cfgs, not ViewerCfg. Kit also uses visualizer_cfgs in Isaac Lab 3,
+    # which keeps the GUI perspective camera independent from the onboard robot camera.
+    _requested_viz = _requested_visualizers()
+    if "newton" in _requested_viz or "newton_gl" in _requested_viz:
         from isaaclab_visualizers.newton import NewtonVisualizerCfg
+
         newton_viz_cfg = NewtonVisualizerCfg()
-        newton_viz_cfg.eye = (-2.5, -0.5, 1.5)      # initial interactive framing
-        newton_viz_cfg.lookat = (0.0, 0.0, 0.0)
-        newton_viz_cfg.tiled_cam_view = True        # follow-cam panel (Newton's follow path)
+        newton_viz_cfg.eye = KIT_VIEWER_EYE    # initial interactive framing
+        newton_viz_cfg.lookat = KIT_VIEWER_LOOKAT
+        newton_viz_cfg.tiled_cam_view = True    # follow-cam panel (Newton's follow path)
         newton_viz_cfg.tiled_cam_num = 1
         newton_viz_cfg.tiled_cam_target_prim_path = "/World/envs/*/Robot"
-        newton_viz_cfg.tiled_cam_eye = (-2.5, -0.5, 1.5)
-        env_cfg.sim.visualizer_cfgs = [newton_viz_cfg]
+        newton_viz_cfg.tiled_cam_eye = KIT_VIEWER_EYE
+        _append_visualizer_cfg(env_cfg, newton_viz_cfg)
+    if "kit" in _requested_viz:
+        _configure_kit_visualizer(env_cfg)
 
     # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
     # rollouts collected by each rank explore different states (matches Isaac Lab's
@@ -344,14 +483,14 @@ def run(run_mode,
 
     # Set collision distances and max resample trial from gin config
     env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
-    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = (start_pose_collision_distance)
 
     # Set collision distances and max resample trial from gin config
     env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
-    env_cfg.events.reset_base.params["collision_distance"] = start_pose_collision_distance
+    env_cfg.events.reset_base.params["collision_distance"] = (start_pose_collision_distance)
 
     # Disable rewards, termination and curriculum for eval.
-    if run_mode == 'eval' or run_mode == 'record':
+    if run_mode == "eval" or run_mode == "record":
         env_cfg.rewards = None
         env_cfg.terminations = None
         env_cfg.curriculum = None
@@ -360,11 +499,21 @@ def run(run_mode,
     record_video = args_cli.video and is_rank_zero
     # Use CLI flag if provided, otherwise use gin config
     precompute_flag = args_cli.precompute_valid_poses or precompute_valid_poses
-    precompute_orientations_flag = args_cli.precompute_valid_orientations or precompute_valid_orientations
-    env = RLESEnvWrapper(cfg=env_cfg,
-                         render_mode="rgb_array" if record_video else None,
-                         precompute_valid_poses=precompute_flag,
-                         precompute_valid_orientations=precompute_orientations_flag)
+    precompute_orientations_flag = (args_cli.precompute_valid_orientations
+                                    or precompute_valid_orientations)
+    env = RLESEnvWrapper(
+        cfg=env_cfg,
+        render_mode="rgb_array" if record_video else None,
+        precompute_valid_poses=precompute_flag,
+        precompute_valid_orientations=precompute_orientations_flag,
+    )
+    if not is_nurec_scene and "kit" in _requested_viz:
+        _configure_kit_scene_partition()
+    if is_nurec_scene and "kit" in _requested_viz:
+        configure_nurec_kit_viewport(
+            nurec_usd_path=env_cfg.scene.environment.spawn.usd_path,
+            spg_runtime=args_cli.spg_runtime,
+        )
 
     # Precompute valid pose locations if requested
     if precompute_flag and env.collision_checker.is_initialized():
@@ -372,7 +521,8 @@ def run(run_mode,
         env.collision_checker.precompute_valid_poses(
             start_collision_distance=start_pose_collision_distance,
             goal_collision_distance=goal_pose_collision_distance,
-            precompute_valid_orientations=precompute_orientations_flag)
+            precompute_valid_orientations=precompute_orientations_flag,
+        )
 
     # Setup video if enabled.
     if record_video:
@@ -394,33 +544,35 @@ def run(run_mode,
         env = MultiCameraVideoRecorder(env, **video_kwargs)
 
     # Setup the agent.
-    rl_trainer = ResidualPPOTrainer(env=env,
-                                    base_policy=base_policy,
-                                    output_dir=args_cli.output_dir,
-                                    logger=logger,
-                                    device=device)
+    rl_trainer = ResidualPPOTrainer(
+        env=env,
+        base_policy=base_policy,
+        output_dir=args_cli.output_dir,
+        logger=logger,
+        device=device,
+    )
 
-    if run_mode == 'train':
+    if run_mode == "train":
         if args_cli.checkpoint_path:
             rl_trainer.load(path=args_cli.checkpoint_path)
         rl_trainer.learn(num_iterations)
-    elif run_mode == 'eval':
+    elif run_mode == "eval":
         if args_cli.checkpoint_path:
             rl_trainer.load(path=args_cli.checkpoint_path, load_optimizer=False)
         rl_trainer.eval(num_iterations, distillation_policy, args_cli.gr00t_policy)
-    elif run_mode == 'record':
+    elif run_mode == "record":
         metadata = {
-            'embodiment': embodiment,
-            'environment': environment,
-            'batch_size': num_envs,
-            'sequence_length': num_steps_per_iteration,
-            'seed': seed,
-            'checkpoint_path': args_cli.checkpoint_path
+            "embodiment": embodiment,
+            "environment": environment,
+            "batch_size": num_envs,
+            "sequence_length": num_steps_per_iteration,
+            "seed": seed,
+            "checkpoint_path": args_cli.checkpoint_path,
         }
         rl_trainer.load(path=args_cli.checkpoint_path, load_optimizer=False)
-        rl_trainer.record(num_iterations, metadata, os.path.join(args_cli.output_dir, 'data'))
+        rl_trainer.record(num_iterations, metadata, os.path.join(args_cli.output_dir, "data"))
     else:
-        raise ValueError('Unsupported run mode.')
+        raise ValueError("Unsupported run mode.")
 
     # Log configs.
     logger.log_config(gin_config_to_dictionary(gin.config._OPERATIVE_CONFIG))
@@ -435,23 +587,23 @@ def main():
 
     # Override gin-configurable parameters with command line arguments.
     if args_cli.embodiment is not None:
-        gin.bind_parameter('run.embodiment', args_cli.embodiment)
+        gin.bind_parameter("run.embodiment", args_cli.embodiment)
     if args_cli.environment is not None:
-        gin.bind_parameter('run.environment', args_cli.environment)
+        gin.bind_parameter("run.environment", args_cli.environment)
     if args_cli.num_envs is not None:
-        gin.bind_parameter('run.num_envs', args_cli.num_envs)
+        gin.bind_parameter("run.num_envs", args_cli.num_envs)
     if args_cli.precompute_valid_poses:
-        gin.bind_parameter('run.precompute_valid_poses', True)
+        gin.bind_parameter("run.precompute_valid_poses", True)
     if args_cli.precompute_valid_orientations:
-        gin.bind_parameter('run.precompute_valid_orientations', True)
+        gin.bind_parameter("run.precompute_valid_orientations", True)
     if args_cli.disable_terrain:
-        gin.bind_parameter('run.disable_terrain', True)
+        gin.bind_parameter("run.disable_terrain", True)
 
     # Run the training/evaluation/recording.
     run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Run the main function.
     main()
     # Close the sim app.

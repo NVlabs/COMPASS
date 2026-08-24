@@ -63,7 +63,7 @@ class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
 
         # Create the occupancy map for collision check.
         self.collision_checker = env.collision_checker
-        self._env = env  # Store env reference to access precompute_valid_orientations flag
+        self._env = env    # Store env reference to access precompute_valid_orientations flag
 
     def __str__(self) -> str:
         msg = "UniformCollisionFreePoseCommand:\n"
@@ -78,9 +78,9 @@ class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
 
             # Try to use orientation-aware sampling if available and enabled
             use_precomputed_orientations = False
-            if (hasattr(self._env, 'precompute_valid_orientations') and
-                    self._env.precompute_valid_orientations and
-                    hasattr(self.collision_checker, 'sample_goal_pose_with_orientation')):
+            if (hasattr(self._env, 'precompute_valid_orientations')
+                    and self._env.precompute_valid_orientations
+                    and hasattr(self.collision_checker, 'sample_goal_pose_with_orientation')):
                 try:
                     sampled_positions, sampled_yaws = (
                         self.collision_checker.sample_goal_pose_with_orientation(
@@ -177,6 +177,6 @@ class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
         # Get the points relative to the environment origin if the env prime is not global.
         if self._env.scene.cfg.environment.prim_path.startswith('/World/envs/'):
             sampled_points_r = sampled_points_r - self._env.scene.env_origins[env_ids, :2]
-        in_collisions = self.collision_checker.is_in_collision(
-            sampled_points_r, distance=self.cfg.collision_distance)
+        in_collisions = self.collision_checker.is_in_collision(sampled_points_r,
+                                                               distance=self.cfg.collision_distance)
         return env_ids[torch.where(in_collisions == 1)[0]]

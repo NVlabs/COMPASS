@@ -18,12 +18,14 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 
+# pylint: disable=wrong-import-position
 import numpy as np
 import h5py
 import gin
 # Set matplotlib backend before importing pyplot to avoid GUI backend issues
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend for headless environments
+
+matplotlib.use('Agg')    # Use non-interactive backend for headless environments
 import matplotlib.pyplot as plt
 import torch
 import torch.distributed as dist
@@ -51,7 +53,8 @@ class ResidualPPOTrainer:
                  ckpt_save_interval=50,
                  debug_viz=False,
                  max_debug_images=2,
-                 debug_image_interval=10):
+                 debug_image_interval=10,
+                 debug_image_step=0):
         # Prepare log directory. exist_ok=True avoids a TOCTOU race when several
         # torchrun ranks check + create concurrently.
         os.makedirs(output_dir, exist_ok=True)
@@ -112,7 +115,8 @@ class ResidualPPOTrainer:
 
         # Init debug images directory and counter. Independent of `debug_viz`
         # (which controls action-arrow visualization); debug image saving is
-        # gated by `max_debug_images` (None/0 = disabled) and `debug_image_interval`.
+        # gated by `max_debug_images` (None/0 = disabled), `debug_image_interval`,
+        # and `debug_image_step`.
         self.debug_images_dir = os.path.join(output_dir, 'debug_images')
         if not os.path.exists(self.debug_images_dir):
             os.makedirs(self.debug_images_dir, exist_ok=True)
@@ -121,8 +125,9 @@ class ResidualPPOTrainer:
         # each grid is comprised of 8 images, and so for 64 envs, there would be
         # 64 / 8 = 8 grids. But we can save less than 8 grids if we want to.
         self.max_debug_images = max_debug_images
-        # Save images every `debug_image_interval` iterations
+        # Save one rollout step every `debug_image_interval` iterations.
         self.debug_image_interval = debug_image_interval
+        self.debug_image_step = debug_image_step
 
         self.env.reset()
 
@@ -318,7 +323,7 @@ class ResidualPPOTrainer:
                             times[f"rollout/env_step/{_k}"] = times.get(
                                 f"rollout/env_step/{_k}", 0.0) + _v
 
-                        # Save debug camera grids (self-gated by max_debug_images / interval / step).
+                        # Save debug camera grids, gated by interval and step.
                         self._save_debug_images(obs_dict, it, _)
 
                         # Move time out information to the extras dict
@@ -589,7 +594,7 @@ class ResidualPPOTrainer:
                                   step=target_iteration)
 
     def _save_debug_images(self, obs_dict, iteration, step):
-        """Save debug images from all cameras as multiple grids for 1 step during training."""
+        """Save debug images from all cameras as multiple grids during training."""
         try:
             if self.max_debug_images is None or self.max_debug_images == 0:
                 return
@@ -597,12 +602,12 @@ class ResidualPPOTrainer:
             if "policy" not in obs_dict or "camera_rgb_img" not in obs_dict["policy"]:
                 return
 
-            # Only save images for the first step to avoid too many files
-            if step != 0:
+            # Only save one rollout step to avoid too many files.
+            if step != self.debug_image_step:
                 return
 
-            # Only save images at specified iteration intervals
-            if iteration % self.debug_image_interval != 0:
+            # Only save images at specified iteration intervals.
+            if self.debug_image_interval <= 0 or iteration % self.debug_image_interval != 0:
                 return
 
             camera_rgb = obs_dict["policy"]["camera_rgb_img"]
@@ -635,7 +640,8 @@ class ResidualPPOTrainer:
 
                 for env_idx in range(start_env, end_env):
                     # Process RGB image
-                    rgb_img = rgb_images_np[env_idx].copy()  # Make a copy to avoid modifying original
+                    rgb_img = rgb_images_np[env_idx].copy(
+                    )    # Make a copy to avoid modifying original
 
                     # Handle different image shapes - camera images are flattened in observations
                     if len(rgb_img.shape) == 1:
@@ -646,7 +652,8 @@ class ResidualPPOTrainer:
                         if rgb_img.size == expected_size:
                             rgb_img = rgb_img.reshape(height, width, channels)
                         else:
-                            print(f"[WARNING] Image size mismatch: expected {expected_size}, got {rgb_img.size}")
+                            print("[WARNING] Image size mismatch: "
+                                  f"expected {expected_size}, got {rgb_img.size}")
                             continue
                     elif len(rgb_img.shape) == 3:
                         # Already in (H, W, C) or (C, H, W) format
@@ -719,8 +726,46 @@ class ResidualPPOTrainer:
                                               image_path=grid_image_path,
                                               step=iteration)
 
+            self._save_debug_viewport_image(iteration, step)
+
         except (KeyError, IOError, OSError, ValueError, RuntimeError, AttributeError) as e:
             print(f"Warning: Failed to save debug images: {e}")
+
+    def _save_debug_viewport_image(self, iteration, step):
+        """Best-effort capture of the active Kit viewport for debugging GUI camera issues."""
+        if not self.is_rank_zero:
+            return
+
+        try:
+            import asyncio    # pylint: disable=import-outside-toplevel
+            import omni.kit.viewport.utility as viewport_utils    # pylint: disable=import-outside-toplevel
+
+            viewport = viewport_utils.get_active_viewport()
+            if viewport is None:
+                return
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            filename = f"kit_viewport_iter_{iteration:04d}_step_{step:04d}_{timestamp}.png"
+            filepath = os.path.join(self.debug_images_dir, filename)
+            capture_helper = viewport_utils.capture_viewport_to_file(viewport, file_path=filepath)
+
+            if hasattr(capture_helper, "wait_for_result"):
+                wait_task = capture_helper.wait_for_result(completion_frames=5)
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(wait_task)
+                else:
+                    loop.run_until_complete(wait_task)
+
+            metadata_path = f"{filepath}.txt"
+            with open(metadata_path, "w", encoding="utf-8") as metadata_file:
+                metadata_file.write(f"camera_path: {viewport.camera_path}\n")
+                metadata_file.write(
+                    f"render_product_path: {getattr(viewport, 'render_product_path', '')}\n")
+                metadata_file.write(f"resolution: {getattr(viewport, 'resolution', '')}\n")
+
+        except Exception as exc:    # pylint: disable=broad-except
+            print(f"Warning: Failed to save Kit viewport debug image: {type(exc).__name__}: {exc}")
 
     def _create_image_grid(self, images, subtitles, iteration, step, grid_idx=0):
         """Create and save a grid of images. Returns the filepath of the saved image."""
@@ -786,8 +831,13 @@ class ResidualPPOTrainer:
             plt.tight_layout()
             # Use PNG format for better compatibility and lossless quality
             # Set format explicitly and ensure proper saving
-            plt.savefig(filepath, dpi=150, bbox_inches='tight', format='png',
-                       facecolor='white', edgecolor='none', pad_inches=0.1)
+            plt.savefig(filepath,
+                        dpi=150,
+                        bbox_inches='tight',
+                        format='png',
+                        facecolor='white',
+                        edgecolor='none',
+                        pad_inches=0.1)
             plt.close()
 
             # Verify file was created and is readable

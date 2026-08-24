@@ -26,7 +26,7 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 from isaaclab.utils.noise import UniformNoiseCfg as Unoise
 from isaaclab_physx.physics import PhysxCfg
 
@@ -208,7 +208,7 @@ class EventCfg:
                 "pitch": (0.0, 0.0),
                 "yaw": (0.0, 0.0),
             },
-            # Default collision distance for start pose sampling
+    # Default collision distance for start pose sampling
             "collision_distance": 0.75,
         },
     )
@@ -322,10 +322,8 @@ class GoalReachingEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
         self.sim.physics_material.restitution = 0.0
+        # Keep synthetic scenes on the policy cadence unless run.render_interval overrides it.
         self.sim.render_interval = self.decimation
-        # render settings
-        self.sim.render.enable_dl_denoiser = True
-        self.sim.render.antialiasing_mode = 'DLAA'
         # Update sensor update.
         if self.scene.contact_forces is not None:
             self.scene.contact_forces.update_period = self.sim.dt

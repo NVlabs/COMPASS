@@ -40,7 +40,6 @@ python run.py \
     -c configs/eval_config.gin \
     -o <output_dir> \
     -b <path/to/x_mobility_ckpt> \
-    --enable_cameras \
     --gr00t-policy
 ```
 

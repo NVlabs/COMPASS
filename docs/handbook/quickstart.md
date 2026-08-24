@@ -50,7 +50,6 @@ python run.py \
     -o /tmp/out \
     -b ./assets/x_mobility.ckpt \
     --num_envs 1 \
-    --enable_cameras \
     --visualizer kit
 ```
 

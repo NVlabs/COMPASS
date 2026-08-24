@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 
-from isaaclab.utils import configclass
+from isaaclab.utils.configclass import configclass
 from isaaclab.sensors import CameraCfg
 
 from mobility_es.config import scene_assets

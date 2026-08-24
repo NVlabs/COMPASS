@@ -63,6 +63,7 @@ python osmo/run_osmo.py train \
     --wandb-project <wandb-project> \
     [--resume-ckpt <wandb-artifact>] \
     [--no-residual] \
+    [--dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga] \
     [--image <pre-built-image>]
 ```
 
@@ -77,8 +78,33 @@ python osmo/run_osmo.py eval \
     [--no-residual] \
     [--embodiment h1|spot|carter|g1|digit] \
     [--environment <scene-name>] \
+    [--dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga] \
     [--image <pre-built-image>]
 ```
+
+### NuRec Real2Sim
+
+For NuRec training or eval, pass the scene download arguments explicitly. The
+workflow downloads the scene from
+[`nvidia/PhysicalAI-Robotics-NuRec`](https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-NuRec),
+switches to the Real2Sim gin config, and passes `--nurec-usd-file` through to
+`run.py` alongside `--nurec-scene`.
+
+```bash
+python osmo/run_osmo.py train \
+    --experiment-name nurec-galileo \
+    --wandb-project compass-rl \
+    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --nurec-revision refs/pr/34 \
+    --nurec-usd-file particle_spg-runtime.usdz \
+    --num-envs 12
+```
+
+For NuRec jobs submitted through `run_osmo.py`, use `--nurec-scene` instead of
+`--environment`. The workflow uses that scene for both the Hugging Face download
+and the `run.py --nurec-scene` value.
 
 ### `record`
 
@@ -86,6 +112,7 @@ python osmo/run_osmo.py eval \
 python osmo/run_osmo.py record \
     --experiment-name <name> \
     --dataset-name <output-osmo-dataset> \
+    [--dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga] \
     [--image <pre-built-image>]
 ```
 
@@ -125,6 +152,12 @@ If you do not pass `--image`, `run_osmo.py` will:
 1. Build the appropriate Dockerfile ([`docker/Dockerfile.rl`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.rl) for `train` / `eval` / `record`, [`docker/Dockerfile.distillation`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.distillation) for `distill`) tagged as `<registry-prefix>/compass_<experiment-name>:<short-uuid>`.
 2. `docker push` that tag.
 3. Pass the resulting image into the `osmo workflow submit` command.
+
+Pass `--dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga` to build an Isaac Sim 6.0.1
+image with Isaac Lab pinned to commit
+`20976357cce6498d4f3db91b18540f3969c84247`, instead of the legacy
+`nvcr.io/nvidia/isaac-lab:3.0.0-beta1` base image. The Dockerfile still exposes
+`ISAACLAB_REF` as a build arg for deliberate pin updates.
 
 For repeated runs against the same code, build the image once and pass it via
 `--image` to skip the build/push.
