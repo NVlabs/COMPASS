@@ -242,9 +242,8 @@ AppLauncher.add_app_launcher_args(parser)
 # Parse the arguments
 args_cli = parser.parse_args()
 if args_cli.nurec_scene is not None:
-    if (args_cli.environment is not None and args_cli.environment != args_cli.nurec_scene):
-        parser.error("--nurec-scene and --environment select different scenes. "
-                     "For NuRec runs, pass --nurec-scene only.")
+    if args_cli.environment is not None:
+        parser.error("Pass either --nurec-scene or --environment, not both.")
     args_cli.environment = args_cli.nurec_scene
 apply_nurec_spg_kit_args(args_cli)
 
@@ -428,7 +427,6 @@ def run(
     if environment not in EnvSceneAssetCfgMap:
         raise ValueError(f"Unsupported environment type: {environment}")
     env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
-    is_nurec_scene = environment in NurecSceneAssetCfgMap
     if render_interval is not None:
         env_cfg.sim.render_interval = render_interval
     if num_rerenders_on_reset is not None:
@@ -507,9 +505,10 @@ def run(
         precompute_valid_poses=precompute_flag,
         precompute_valid_orientations=precompute_orientations_flag,
     )
-    if not is_nurec_scene and "kit" in _requested_viz:
+    is_nurec_run = args_cli.nurec_scene is not None
+    if not is_nurec_run and "kit" in _requested_viz:
         _configure_kit_scene_partition()
-    if is_nurec_scene and "kit" in _requested_viz:
+    if is_nurec_run and "kit" in _requested_viz:
         configure_nurec_kit_viewport(
             nurec_usd_path=env_cfg.scene.environment.spawn.usd_path,
             spg_runtime=args_cli.spg_runtime,

@@ -64,7 +64,7 @@ def uses_nurec_spg_runtime(args):
     if getattr(args, "spg_runtime", False):
         return True
 
-    if getattr(args, "environment", None) not in NUREC_SCENE_NAMES:
+    if getattr(args, "nurec_scene", None) not in NUREC_SCENE_NAMES:
         return False
 
     usd_file = getattr(args, "nurec_usd_file", "") or ""

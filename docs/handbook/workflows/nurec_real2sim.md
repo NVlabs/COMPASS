@@ -1,13 +1,13 @@
 # Training & deploying with NuRec Real2Sim scenes
 
 This guide shows how to train and deploy COMPASS navigation policies on
-**NuRec Real2Sim** assets in Isaac Lab. Use Docker when possible; use
-bare-metal only when Docker is unavailable or when you need to debug the Isaac
-Lab checkout directly.
+**NuRec Real2Sim** assets in Isaac Lab. Use Docker for local runs and OSMO for
+cloud runs.
 
 ```{note}
-Validated on **Ubuntu 22.04** / **OVX with RTX**, with **Isaac Lab commit
-`20976357cce6498d4f3db91b18540f3969c84247`** and **Isaac Sim 6.0.1**.
+Validated on **Ubuntu 22.04** / **OVX with RTX**, using the temporary internal
+Isaac Lab 3.0 release image until the matching public Isaac Lab image is
+available.
 ```
 
 ## Docker workflow (recommended)
@@ -58,13 +58,12 @@ You must accept the dataset terms on Hugging Face before downloading.
 
 ### 4. Build and activate the container
 
-The NuRec image uses Isaac Sim 6.0.1 and builds Isaac Lab from the pinned commit
-because there is no matching published Isaac Lab 3.0 GA base image for this
-workflow yet.
+The NuRec image currently uses an internal Isaac Lab 3.0 release base image
+because the old public `3.0.0-beta1` image is not compatible with this branch.
+Replace it with the matching public Isaac Lab image after release.
 
 ```bash
-export COMPASS_IMAGE_TAG=nurec-lab-3.0-ga
-export COMPASS_DOCKERFILE=docker/Dockerfile.rl.isaaclab-3.0-ga
+export COMPASS_IMAGE_TAG=isaaclab-3.0-ea
 
 ./docker/run.sh build
 source ./docker/activate
@@ -213,9 +212,9 @@ To run headless, omit `--visualizer kit` or pass `--visualizer None`.
 
 ```{note}
 Approximate per-GPU VRAM for `nova_carter-galileo`, Carter, 320x512 camera:
-particle assets use `8.5 GB + 1.0 GB × num_envs`; volume assets use
-`7 GB + 1.75 GB × num_envs`. Safe particle defaults are about 18 envs on 32 GB
-and 32 envs on 48 GB. Reduce `--num_envs` on OOM.
+particle assets use `8.5 GB + 1.0 GB × num_envs`.
+Safe particle defaults are about 18 envs on 32 GB and 32 envs on 48 GB.
+Reduce `--num_envs` on OOM.
 ```
 
 ### 8. Train on multiple GPUs
@@ -245,7 +244,7 @@ python run.py \
     -o <output_dir> \
     -b ./assets/x_mobility.ckpt \
     -p <path/to/residual_policy_ckpt> \
-    --embodiment <embodiment_type> \
+    --embodiment carter \
     --nurec-scene nova_carter-galileo \
     --num_envs <num_envs> \
     --video \
@@ -262,7 +261,7 @@ cd <output_dir>/
 python <path/to/COMPASS>/onnx_conversion.py \
     -b <x_mobility_ckpt> \
     -r <residual_policy_ckpt> \
-    -e <embodiment_type> \
+    -e carter \
     -o <output.onnx> \
     -j <output.jit>
 
@@ -290,14 +289,15 @@ NuRec OSMO jobs download COMPASS USDs, the X-Mobility checkpoint, and the
 requested NuRec scene inside the workflow. When `--nurec-scene` is set, the
 workflow switches to the Real2Sim gin config and passes `--nurec-scene` and
 `--nurec-usd-file` to `run.py`.
+Use `--nurec-scene` instead of `--environment` so the same scene drives both
+the Hugging Face asset download and the NuRec runtime branch.
 
 Training example:
 
 ```bash
 python osmo/run_osmo.py train \
-    --experiment-name nurec-galileo \
-    --wandb-project <wandb-project> \
-    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
+    --experiment-name carter-galileo-osmo \
+    --wandb-project compass-nurec \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
     --nurec-revision refs/pr/34 \
@@ -310,10 +310,9 @@ Evaluation example:
 
 ```bash
 python osmo/run_osmo.py eval \
-    --experiment-name nurec-galileo-eval \
-    --wandb-project <wandb-project> \
+    --experiment-name carter-galileo-osmo \
+    --wandb-project compass-nurec \
     --checkpoint <residual-wandb-artifact> \
-    --dockerfile docker/Dockerfile.rl.isaaclab-3.0-ga \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
     --nurec-revision refs/pr/34 \
@@ -327,161 +326,8 @@ Use W&B videos and robot-camera debug images for run inspection. Add
 `--image <pre-built-image>` to skip build and push. Full reference:
 [OSMO cloud submission](../osmo.md).
 
-## Bare-metal Isaac Lab workflow
-
-### 1. Prepare prerequisites
-
-- An NVIDIA GPU + driver that satisfies the Isaac Sim 6.0.1 requirements.
-- Conda.
-- A Hugging Face token with access to the COMPASS and NuRec assets.
-- The Hugging Face CLI on `PATH`.
-
-```bash
-python3 -m pip install --user -U 'huggingface_hub[cli]'
-```
-
-### 2. Install Isaac Lab and Isaac Sim
-
-```bash
-git clone https://github.com/isaac-sim/IsaacLab.git
-cd IsaacLab
-git checkout 20976357cce6498d4f3db91b18540f3969c84247
-
-./isaaclab.sh --conda env_isaaclab_3.0_compass
-conda activate env_isaaclab_3.0_compass
-
-pip install isaacsim[all,extscache]==6.0.1 --extra-index-url https://pypi.nvidia.com
-./isaaclab.sh --install
-./isaaclab.sh -p scripts/tutorials/00_sim/create_empty.py --visualizer kit
-```
-
-```{note}
-`./isaaclab.sh --conda` must run under Python ≥ 3.11. Isaac Sim 6.x requires
-Python 3.12, which the conda step provisions.
-```
-
-### 3. Install COMPASS
-
-```bash
-conda deactivate
-conda activate env_isaaclab_3.0_compass
-
-git clone https://github.com/NVlabs/COMPASS.git
-cd COMPASS
-git fetch
-git checkout real2sim/isaaclab_3.0
-
-export ISAACLAB_PATH=</path/to/IsaacLab>
-
-${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -r requirements.txt
-${ISAACLAB_PATH}/isaaclab.sh -p -m pip install x_mobility/x_mobility-0.1.0-py3-none-any.whl
-cd compass/rl_env
-${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -e exts/mobility_es
-cd -
-```
-
-### 4. Download assets and checkpoints
-
-Use the same host-side asset helper as Docker:
-
-```bash
-export HF_TOKEN=hf_xxx
-
-./docker/run.sh assets \
-    --nurec-scene nova_carter-galileo \
-    --nurec-revision refs/pr/34
-```
-
-It installs scene folders under
-`compass/rl_env/exts/mobility_es/mobility_es/usd/` and writes the base policy to
-`./assets/x_mobility.ckpt`.
-
-### 5. Test the setup
-
-```bash
-cd compass/rl_env
-${ISAACLAB_PATH}/isaaclab.sh -p scripts/play.py --visualizer kit
-cd -
-```
-
-### 6. Train
-
-```bash
-${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
-    -c configs/train_config_real2sim.gin \
-    -o <output_dir> \
-    -b ./assets/x_mobility.ckpt \
-    --embodiment <embodiment_type> \
-    --nurec-scene nova_carter-galileo \
-    --num_envs 12 \
-    --video \
-    --video_interval 1 \
-    --visualizer kit \
-    --precompute_valid_poses
-```
-
-Use the same NuRec scene names, checkpoint layout, headless mode, and VRAM
-sizing guidance from the Docker workflow.
-
-### 7. Train on multiple GPUs
-
-```bash
-${ISAACLAB_PATH:?}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node=<N> \
-    run.py --distributed \
-    -c configs/train_config_real2sim.gin \
-    -o <output_dir> \
-    -b ./assets/x_mobility.ckpt \
-    --embodiment carter \
-    --nurec-scene nova_carter-galileo \
-    --num_envs <per-GPU> \
-    --precompute_valid_poses \
-    --video \
-    --video_interval 1
-```
-
-`--num_envs` is per GPU. Run headless for multi-GPU by omitting
-`--visualizer kit`.
-
-### 8. Evaluate
-
-```bash
-${ISAACLAB_PATH:?}/isaaclab.sh -p run.py \
-    -c configs/eval_config_real2sim.gin \
-    -o <output_dir> \
-    -b ./assets/x_mobility.ckpt \
-    -p <path/to/residual_policy_ckpt> \
-    --embodiment <embodiment_type> \
-    --nurec-scene nova_carter-galileo \
-    --num_envs <num_envs> \
-    --video \
-    --video_interval 1 \
-    --visualizer kit
-```
-
-### 9. Export and deploy
-
-```bash
-cd <output_dir>/
-python3 <path/to/COMPASS>/onnx_conversion.py \
-    -b <x_mobility_ckpt> \
-    -r <residual_policy_ckpt> \
-    -e <embodiment_type> \
-    -o <output.onnx> \
-    -j <output.jit>
-
-python3 <path/to/COMPASS>/trt_conversion.py \
-    -o <model.onnx> \
-    -t <output.engine>
-```
-
-Deploy through the
-[COMPASS ROS2 Deployment Guide](https://github.com/NVlabs/COMPASS/tree/main/ros2_deployment).
-
 ## Troubleshooting
 
-- **Isaac Sim extension errors:** reinstall with
-  `isaacsim[all,extscache]==6.0.1`; this usually applies to bare-metal
-  installs.
 - **Pose sampling fails:** lower collision distances, enable
   `--precompute_valid_poses`, and confirm the occupancy map exists.
 - **Robot spawns outside the scene:** check the scene's origin convention.
