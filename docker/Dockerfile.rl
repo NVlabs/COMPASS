@@ -1,8 +1,11 @@
-FROM nvcr.io/nvidia/isaac-lab:3.0.0-beta1
+# Temporary internal Isaac Lab image from the private NGC registry.
+# Replace with public nvcr.io/nvidia/isaac-lab:<version> after the fix is released.
+FROM nvcr.io/0947644777160149/internal/isaac-lab:latest-release-3.0.0-119c17247c436f3d97c07dd26c7a52404d3dfc7c
 
 # Omniverse runtime env (required for any kit / pip step run as root in the container).
 ENV ACCEPT_EULA=Y
 ENV OMNI_KIT_ALLOW_ROOT=1
+USER root
 
 # COMPASS lives in /workspace/COMPASS so /workspace/isaaclab (from the base image)
 # is preserved when docker/run.sh bind-mounts the host repo at runtime.

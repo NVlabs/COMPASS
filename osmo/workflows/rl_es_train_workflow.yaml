@@ -53,7 +53,7 @@ workflow:
           mv /usr/share/vulkan /usr/share/vulkan_hidden
         fi
 
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli login --token {{hf_token}}
+        python -m huggingface_hub.commands.huggingface_cli login --token {{hf_token}}
 
         # Generate your W&B API key: https://wandb.ai/authorize
         export WANDB_API_KEY={{wandb_api_key}}
@@ -69,7 +69,7 @@ workflow:
 
         # Download and unpack the COMPASS USDs from HuggingFace.
         echo "Downloading compass_usds.zip from huggingface.co/nvidia/COMPASS"
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+        python -m huggingface_hub.commands.huggingface_cli \
             download nvidia/COMPASS compass_usds.zip --local-dir ./
         unzip -q -o compass_usds.zip
         mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
@@ -80,7 +80,7 @@ workflow:
             ENVIRONMENT="$NUREC_SCENE"
           fi
           echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
-          ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+          python -m huggingface_hub.commands.huggingface_cli \
               download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
               --revision "$NUREC_REVISION" \
               --local-dir ./compass/rl_env/exts/mobility_es/mobility_es/usd \
@@ -96,7 +96,7 @@ workflow:
 
         # Download X-Mobility base-policy checkpoint from HuggingFace.
         echo "Downloading X-Mobility checkpoint from huggingface.co/nvidia/X-Mobility"
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+        python -m huggingface_hub.commands.huggingface_cli \
             download nvidia/X-Mobility x_mobility-nav2-semantic_action_path.ckpt --local-dir ./
         mv x_mobility-nav2-semantic_action_path.ckpt model.ckpt
 
@@ -104,7 +104,7 @@ workflow:
         RESUME_CKPT_ARTIFACT={{resume_ckpt_artifact}}
         if [[ -n $RESUME_CKPT_ARTIFACT ]]; then
           echo "Downloading resume checkpoint: $RESUME_CKPT_ARTIFACT"
-          ${ISAACLAB_PATH}/isaaclab.sh -p -m wandb artifact get $RESUME_CKPT_ARTIFACT --root ./resume_ckpt/
+          python -m wandb artifact get $RESUME_CKPT_ARTIFACT --root ./resume_ckpt/
           RESUME_CKPT=$(ls ./resume_ckpt/model_*.pt | sort -V | tail -n 1)
         fi
 
@@ -112,7 +112,7 @@ workflow:
         # spawns its own Isaac Sim instance + env; gradients sync via manual
         # all-reduce in PPO.update. Total parallel envs = {{num_gpus}} *
         # num_envs. NuRec assets are memory-heavy, so tune --num-envs per GPU.
-        TRAIN_CMD="${ISAACLAB_PATH}/isaaclab.sh -p -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c $TRAIN_CONFIG -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --num_envs {{num_envs}}"
+        TRAIN_CMD="python -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c $TRAIN_CONFIG -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --num_envs {{num_envs}}"
 
         if [[ -n $EMBODIMENT ]]; then
           TRAIN_CMD+=" --embodiment $EMBODIMENT"
@@ -144,7 +144,7 @@ workflow:
         # fine for a one-shot eval at the end of training.
         eval_ckpt=$(ls $OUTPUT_DIR/model_*.pt | sort -V | tail -n 1)
         ckpt_name=$(basename "$eval_ckpt")
-        EVAL_CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --headless --video --video_interval 1 --num_envs {{num_envs}}"
+        EVAL_CMD="python run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --video --video_interval 1 --num_envs {{num_envs}}"
         if [[ -z $NO_RESIDUAL ]]; then
           EVAL_CMD+=" -b ./model.ckpt"
         fi

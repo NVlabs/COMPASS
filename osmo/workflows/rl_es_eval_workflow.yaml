@@ -99,7 +99,7 @@ workflow:
         fi
 
         # Launch evaluation.
-        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --headless --video --video_interval 1 --num_envs {{num_envs}}"
+        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --video_interval 1 --num_envs {{num_envs}}"
 
         if [[ -n $EMBODIMENT ]]; then
             CMD+=" --embodiment $EMBODIMENT"
