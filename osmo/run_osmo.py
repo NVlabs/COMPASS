@@ -208,8 +208,6 @@ def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
         dockerfile_path = REPO_ROOT / dockerfile_path
     if not dockerfile_path.is_file():
         message = f"ERROR: Dockerfile not found: {dockerfile_path}\n"
-        if "isaac-lab-3.0-ga" in dockerfile:
-            message += "Did you mean docker/Dockerfile.rl.isaaclab-3.0-ga?\n"
         sys.stderr.write(message)
         sys.exit(2)
     image = f"{registry_prefix.rstrip('/')}/compass_{experiment}:{uuid.uuid4().hex[:8]}"
