@@ -64,7 +64,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = Path(__file__).resolve().parent / "workflows"
-DEFAULT_NUREC_REVISION = "refs/pr/34"
 
 # subcommand -> (workflow YAML filename, Dockerfile path relative to REPO_ROOT)
 SUBCOMMAND_CONFIG = {
@@ -113,11 +112,16 @@ def parse_args():
             "For NuRec runs this also selects the runtime environment.")
         sp.add_argument(
             "--nurec-revision",
-            default=DEFAULT_NUREC_REVISION,
-            help="Git revision in nvidia/PhysicalAI-Robotics-NuRec used for NuRec assets.")
+            default="",
+            help="Optional Git revision in nvidia/PhysicalAI-Robotics-NuRec used for NuRec "
+            "assets. Empty uses the dataset repo default branch.")
         sp.add_argument("--nurec-usd-file",
                         default="",
                         help="NuRec USD filename passed to run.py. Empty uses run.py's default.")
+        sp.add_argument("--nurec-omap-file",
+                        default="",
+                        help="NuRec occupancy-map filename passed to run.py. "
+                        "Empty uses run.py's default.")
 
     train = sub.add_parser("train", help="Submit residual RL training.")
     add_common(train)
@@ -264,6 +268,7 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "nurec_scene": args.nurec_scene,
         "nurec_revision": args.nurec_revision,
         "nurec_usd_file": args.nurec_usd_file,
+        "nurec_omap_file": args.nurec_omap_file,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)
 
@@ -287,6 +292,7 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "nurec_scene": args.nurec_scene,
         "nurec_revision": args.nurec_revision,
         "nurec_usd_file": args.nurec_usd_file,
+        "nurec_omap_file": args.nurec_omap_file,
     }
     submit_workflow(yaml_path, set_args, args.dry_run)
 

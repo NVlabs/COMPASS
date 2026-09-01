@@ -51,6 +51,7 @@ workflow:
         NUREC_SCENE="{{nurec_scene}}"
         NUREC_REVISION="{{nurec_revision}}"
         NUREC_USD_FILE="{{nurec_usd_file}}"
+        NUREC_OMAP_FILE="{{nurec_omap_file}}"
         EVAL_CONFIG=configs/eval_config.gin
 
         # Download and unpack the COMPASS USDs from HuggingFace.
@@ -65,10 +66,16 @@ workflow:
           if [[ -z "$ENVIRONMENT" ]]; then
             ENVIRONMENT="$NUREC_SCENE"
           fi
-          echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
+          NUREC_REVISION_ARGS=()
+          if [[ -n "$NUREC_REVISION" ]]; then
+            echo "Downloading $NUREC_SCENE NuRec assets from $NUREC_REVISION"
+            NUREC_REVISION_ARGS=(--revision "$NUREC_REVISION")
+          else
+            echo "Downloading $NUREC_SCENE NuRec assets from the dataset default revision"
+          fi
           ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
               download nvidia/PhysicalAI-Robotics-NuRec --repo-type dataset \
-              --revision "$NUREC_REVISION" \
+              "${NUREC_REVISION_ARGS[@]}" \
               --local-dir ./compass/rl_env/exts/mobility_es/mobility_es/usd \
               --include "$NUREC_SCENE/**" \
               --exclude "**/raw_images.zip"
@@ -114,6 +121,9 @@ workflow:
         if [[ -n $NUREC_USD_FILE ]]; then
             CMD+=" --nurec-usd-file $NUREC_USD_FILE"
         fi
+        if [[ -n $NUREC_OMAP_FILE ]]; then
+            CMD+=" --nurec-omap-file $NUREC_OMAP_FILE"
+        fi
 
         if [[ -n $DESTILLATION_CKPT_ARTIFACT ]]; then
             CMD+=" -d $DESTILLATION_CKPT"
@@ -144,5 +154,6 @@ default-values:
   embodiment: ""
   environment: ""
   nurec_scene: ""
-  nurec_revision: refs/pr/34
+  nurec_revision: ""
   nurec_usd_file: ""
+  nurec_omap_file: ""
