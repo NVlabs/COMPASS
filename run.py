@@ -21,79 +21,17 @@ import gymnasium as gym
 
 from isaaclab.app import AppLauncher
 
-from compass.utils.nurec_utils import (
-    PARTICLE_SPG_RUNTIME_USD_FILE,
+from compass.utils.nurec_utils import PARTICLE_SPG_RUNTIME_USD_FILE
+from compass.utils.renderer_utils import (
+    apply_isaac_rtx_camera_renderer_settings,
     apply_nurec_spg_kit_args,
-    configure_nurec_kit_viewport,
+    configure_nurec_isaacsim_rtx_viewport,
 )
-
-KIT_PERSPECTIVE_CAMERA_PATH = "/OmniverseKit_Persp"
-KIT_SCENE_PARTITION = "env_0"
-KIT_VIEWER_EYE = (1.5, -1.5, 2.2)
-KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
-
-
-def _append_visualizer_cfg(env_cfg, visualizer_cfg):
-    existing_cfgs = env_cfg.sim.visualizer_cfgs
-    if existing_cfgs is None:
-        env_cfg.sim.visualizer_cfgs = [visualizer_cfg]
-    elif isinstance(existing_cfgs, list):
-        env_cfg.sim.visualizer_cfgs.append(visualizer_cfg)
-    else:
-        env_cfg.sim.visualizer_cfgs = [existing_cfgs, visualizer_cfg]
-
-
-def _configure_legacy_viewer(env_cfg):
-    env_cfg.viewer.origin_type = "asset_root"
-    env_cfg.viewer.asset_name = "robot"
-    env_cfg.viewer.env_index = 0
-    env_cfg.viewer.cam_prim_path = KIT_PERSPECTIVE_CAMERA_PATH
-    env_cfg.viewer.eye = KIT_VIEWER_EYE
-    env_cfg.viewer.lookat = KIT_VIEWER_LOOKAT
-
-
-def _configure_kit_visualizer(env_cfg):
-    from isaaclab_visualizers.kit import KitVisualizerCfg
-
-    kit_viz_cfg = KitVisualizerCfg()
-    kit_viz_cfg.eye = KIT_VIEWER_EYE
-    kit_viz_cfg.lookat = KIT_VIEWER_LOOKAT
-    kit_viz_cfg.origin_type = "asset"
-    kit_viz_cfg.origin_track_path = "robot"
-    kit_viz_cfg.origin_env_index = 0
-    _append_visualizer_cfg(env_cfg, kit_viz_cfg)
-
-
-def _configure_kit_scene_partition(quiet=False):
-    try:
-        import omni.usd
-        from pxr import Sdf
-    except ImportError as exc:
-        if not quiet:
-            print(f"[WARN] Could not import USD utilities for Kit viewport setup: {exc}")
-        return
-
-    stage = omni.usd.get_context().get_stage()
-    if stage is None:
-        if not quiet:
-            print("[WARN] Could not configure Kit viewport: no active USD stage.")
-        return
-
-    camera_prim = stage.GetPrimAtPath(KIT_PERSPECTIVE_CAMERA_PATH)
-    if not camera_prim or not camera_prim.IsValid():
-        if not quiet:
-            print(f"[WARN] Could not configure Kit viewport: "
-                  f"{KIT_PERSPECTIVE_CAMERA_PATH} does not exist.")
-        return
-
-    attr = camera_prim.GetAttribute("omni:scenePartition")
-    if not attr.IsValid():
-        attr = camera_prim.CreateAttribute("omni:scenePartition", Sdf.ValueTypeNames.Token)
-    attr.Set(KIT_SCENE_PARTITION)
-    if not quiet:
-        print(f"[INFO] Set {KIT_PERSPECTIVE_CAMERA_PATH} scene partition to "
-              f"{KIT_SCENE_PARTITION}.")
-
+from compass.utils.visualizer_utils import (
+    configure_kit_scene_partition,
+    configure_visualizers,
+    requested_visualizers,
+)
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="COMPASS Mobility Generalist.")
@@ -190,21 +128,23 @@ parser.add_argument(
 )
 parser.add_argument(
     "--nurec-usd-file",
-    "--nurec_usd_file",
-    dest="nurec_usd_file",
     type=str,
     default=PARTICLE_SPG_RUNTIME_USD_FILE,
     help="NuRec USD filename under the selected environment folder.",
 )
 parser.add_argument(
+    "--nurec-omap-file",
+    type=str,
+    default=None,
+    help="NuRec occupancy-map YAML filename under the selected environment folder.",
+)
+parser.add_argument(
     "--spg-runtime",
-    "--spg_runtime",
-    dest="spg_runtime",
     action="store_true",
     default=False,
     help="Force SPG runtime Kit args before Isaac Sim starts. "
     f"This is automatic for {PARTICLE_SPG_RUNTIME_USD_FILE} "
-    "in registered NuRec scenes.",
+    "when --nurec-scene is set.",
 )
 parser.add_argument("--num_envs", type=int, help="Number of environments")
 parser.add_argument(
@@ -245,6 +185,8 @@ if args_cli.nurec_scene is not None:
     if args_cli.environment is not None:
         parser.error("Pass either --nurec-scene or --environment, not both.")
     args_cli.environment = args_cli.nurec_scene
+elif args_cli.nurec_omap_file is not None:
+    parser.error("--nurec-omap-file requires --nurec-scene.")
 apply_nurec_spg_kit_args(args_cli)
 
 # launch omniverse app
@@ -262,7 +204,7 @@ from mobility_es.config.h1_env_cfg import H1GoalReachingEnvCfg
 from mobility_es.config.spot_env_cfg import SpotGoalReachingEnvCfg
 from mobility_es.config.g1_env_cfg import G1GoalReachingEnvCfg
 from mobility_es.config.digit_env_cfg import DigitGoalReachingEnvCfg
-from mobility_es.config.nurec_scenes import make_nurec_scene_asset_cfg_map
+from mobility_es.config.nurec_scenes import make_nurec_scene_asset_cfg
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper
 
 from compass.residual_rl.x_mobility_rl import XMobilityBasePolicy
@@ -312,15 +254,12 @@ EnvSceneAssetCfgMap = {
     "hospital": environments.hospital,
     "warehouse_multi_rack": environments.warehouse_multi_rack,
 }
-NurecSceneAssetCfgMap = make_nurec_scene_asset_cfg_map(args_cli.nurec_usd_file)
-EnvSceneAssetCfgMap.update(NurecSceneAssetCfgMap)
-
-
-def _requested_visualizers():
-    requested_viz = getattr(args_cli, "visualizer", None) or []
-    if isinstance(requested_viz, str):
-        requested_viz = requested_viz.split(",")
-    return [v.strip().lower() for v in requested_viz]
+if args_cli.nurec_scene is not None:
+    EnvSceneAssetCfgMap[args_cli.nurec_scene] = make_nurec_scene_asset_cfg(
+        args_cli.nurec_scene,
+        args_cli.nurec_usd_file,
+        args_cli.nurec_omap_file,
+    )
 
 
 def gin_config_to_dictionary(gin_config):
@@ -448,25 +387,13 @@ def run(
     else:
         env_cfg.curriculum = None
 
-    _configure_legacy_viewer(env_cfg)
-
-    # Newton visualizer camera (new Visualizers API). Newton reads its camera from
-    # sim.visualizer_cfgs, not ViewerCfg. Kit also uses visualizer_cfgs in Isaac Lab 3,
-    # which keeps the GUI perspective camera independent from the onboard robot camera.
-    _requested_viz = _requested_visualizers()
-    if "newton" in _requested_viz or "newton_gl" in _requested_viz:
-        from isaaclab_visualizers.newton import NewtonVisualizerCfg
-
-        newton_viz_cfg = NewtonVisualizerCfg()
-        newton_viz_cfg.eye = KIT_VIEWER_EYE    # initial interactive framing
-        newton_viz_cfg.lookat = KIT_VIEWER_LOOKAT
-        newton_viz_cfg.tiled_cam_view = True    # follow-cam panel (Newton's follow path)
-        newton_viz_cfg.tiled_cam_num = 1
-        newton_viz_cfg.tiled_cam_target_prim_path = "/World/envs/*/Robot"
-        newton_viz_cfg.tiled_cam_eye = KIT_VIEWER_EYE
-        _append_visualizer_cfg(env_cfg, newton_viz_cfg)
-    if "kit" in _requested_viz:
-        _configure_kit_visualizer(env_cfg)
+    requested_viz = requested_visualizers(args_cli)
+    configure_visualizers(env_cfg, requested_viz)
+    apply_isaac_rtx_camera_renderer_settings(
+        env_cfg,
+        isaac_rtx=True,
+        spg_runtime=args_cli.spg_runtime,
+    )
 
     # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
     # rollouts collected by each rank explore different states (matches Isaac Lab's
@@ -505,14 +432,14 @@ def run(
         precompute_valid_poses=precompute_flag,
         precompute_valid_orientations=precompute_orientations_flag,
     )
-    is_nurec_run = args_cli.nurec_scene is not None
-    if not is_nurec_run and "kit" in _requested_viz:
-        _configure_kit_scene_partition()
-    if is_nurec_run and "kit" in _requested_viz:
-        configure_nurec_kit_viewport(
-            nurec_usd_path=env_cfg.scene.environment.spawn.usd_path,
-            spg_runtime=args_cli.spg_runtime,
-        )
+    if "kit" in requested_viz:
+        if args_cli.nurec_scene is not None:
+            configure_nurec_isaacsim_rtx_viewport(
+                nurec_usd_path=env_cfg.scene.environment.spawn.usd_path,
+                spg_runtime=args_cli.spg_runtime,
+            )
+        else:
+            configure_kit_scene_partition()
 
     # Precompute valid pose locations if requested
     if precompute_flag and env.collision_checker.is_initialized():
@@ -549,6 +476,7 @@ def run(
         output_dir=args_cli.output_dir,
         logger=logger,
         device=device,
+        save_debug_viewport_images="kit" in requested_viz,
     )
 
     if run_mode == "train":

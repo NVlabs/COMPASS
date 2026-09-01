@@ -17,10 +17,13 @@ Flexible logging system that supports both Weights & Biases and TensorBoard.
 """
 
 import os
+import re
 from typing import Dict, Any, Optional
 
 import wandb
 from tensorboardX import SummaryWriter
+
+_ARTIFACT_COMPONENT_PATTERN = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 class Logger:
@@ -69,6 +72,16 @@ class Logger:
                              "Choose either 'wandb' or 'tensorboard'.")
 
         print(f"Logger initialized with backend: {self.backend}")
+
+    @staticmethod
+    def _sanitize_artifact_component(value: str) -> str:
+        """Convert a run name into a W&B artifact-name-safe component."""
+        sanitized = _ARTIFACT_COMPONENT_PATTERN.sub("-", value).strip("._-")
+        return sanitized or "run"
+
+    def _run_scoped_artifact_name(self, name: str) -> str:
+        run_name = self._sanitize_artifact_component(self.experiment_name)
+        return f"{name}_{run_name}"
 
     def log_image(self, name: str, image_path: str, step: Optional[int] = None):
         """
@@ -136,13 +149,14 @@ class Logger:
             type: Type of the artifact
             description: Description of the artifact
         """
+        artifact_name = self._run_scoped_artifact_name(name)
         if self.backend == "wandb":
-            artifact = wandb.Artifact(name=name, type=type, description=description)
+            artifact = wandb.Artifact(name=artifact_name, type=type, description=description)
             artifact.add_file(artifact_path)
             wandb.log_artifact(artifact)
         else:
             # TensorBoard doesn't support artifacts directly
-            print(f"Artifacts not supported in TensorBoard. Artifact '{name}' not logged.")
+            print(f"Artifacts not supported in TensorBoard. Artifact '{artifact_name}' not logged.")
 
     def log_config(self, config: Dict[str, Any]):
         """

@@ -16,6 +16,7 @@
 # Environment:
 #   HF_TOKEN  HuggingFace token (https://huggingface.co/settings/tokens)
 #             Required because the COMPASS HF repo is gated. The flag overrides.
+#   NUREC_REVISION Optional NuRec dataset revision. Empty uses the HF default branch.
 
 set -eu
 
@@ -36,7 +37,7 @@ CACHE_DIR="${REPO_ROOT}/assets"
 HF_TOKEN_ARG=""
 FORCE=false
 NUREC_SCENES=()
-NUREC_REVISION="${NUREC_REVISION:-refs/pr/34}"
+NUREC_REVISION="${NUREC_REVISION:-}"
 
 USDS_URL="https://huggingface.co/nvidia/COMPASS/resolve/main/compass_usds.zip"
 USDS_ZIP="${CACHE_DIR}/compass_usds.zip"
@@ -220,10 +221,17 @@ download_nurec_scenes() {
             continue
         fi
 
-        step "Downloading NuRec scene ${scene} from ${NUREC_REPO}@${NUREC_REVISION} → ${USDS_DIR}"
+        local revision_args=()
+        local revision_label="dataset default revision"
+        if [ -n "${NUREC_REVISION}" ]; then
+            revision_args=(--revision "${NUREC_REVISION}")
+            revision_label="${NUREC_REPO}@${NUREC_REVISION}"
+        fi
+
+        step "Downloading NuRec scene ${scene} from ${revision_label} → ${USDS_DIR}"
         HF_TOKEN="${HF_TOKEN_EFFECTIVE}" hf download "${NUREC_REPO}" \
             --repo-type dataset \
-            --revision "${NUREC_REVISION}" \
+            "${revision_args[@]}" \
             --local-dir "${USDS_DIR}" \
             --include "${scene}/**" \
             --exclude "**/raw_images.zip"
@@ -245,7 +253,11 @@ show_summary() {
         echo "  ✗ X-Mobility ckpt: ${CKPT_FILE} (missing)"
     fi
     if [ "${#NUREC_SCENES[@]}" -gt 0 ]; then
-        echo "  NuRec revision:   ${NUREC_REPO}@${NUREC_REVISION}"
+        if [ -n "${NUREC_REVISION}" ]; then
+            echo "  NuRec revision:   ${NUREC_REPO}@${NUREC_REVISION}"
+        else
+            echo "  NuRec revision:   ${NUREC_REPO} default branch"
+        fi
         local scene
         for scene in "${NUREC_SCENES[@]}"; do
             echo "  ✓ NuRec scene:     ${USDS_DIR}/${scene}"

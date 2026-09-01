@@ -54,7 +54,8 @@ class ResidualPPOTrainer:
                  debug_viz=False,
                  max_debug_images=2,
                  debug_image_interval=10,
-                 debug_image_step=0):
+                 debug_image_step=0,
+                 save_debug_viewport_images=False):
         # Prepare log directory. exist_ok=True avoids a TOCTOU race when several
         # torchrun ranks check + create concurrently.
         os.makedirs(output_dir, exist_ok=True)
@@ -128,6 +129,7 @@ class ResidualPPOTrainer:
         # Save one rollout step every `debug_image_interval` iterations.
         self.debug_image_interval = debug_image_interval
         self.debug_image_step = debug_image_step
+        self.save_debug_viewport_images = save_debug_viewport_images
 
         self.env.reset()
 
@@ -583,9 +585,9 @@ class ResidualPPOTrainer:
         # Video generation can be slower than this function call, so add one iteration
         # delay for video upload.
         target_iteration = iteration - 1
-        target_video_path = os.path.join(
-            self.output_dir, 'videos',
-            f'rl-video-step-{target_iteration*self.num_steps_per_env}.mp4')
+        video_step = target_iteration * self.num_steps_per_env
+        target_video_path = os.path.join(self.output_dir, 'videos', 'robot_camera',
+                                         f'rl-video-step-{video_step}.mp4')
         print(target_video_path)
         if os.path.exists(target_video_path):
             self.logger.log_video(name="episode_video",
@@ -726,7 +728,8 @@ class ResidualPPOTrainer:
                                               image_path=grid_image_path,
                                               step=iteration)
 
-            self._save_debug_viewport_image(iteration, step)
+            if self.save_debug_viewport_images:
+                self._save_debug_viewport_image(iteration, step)
 
         except (KeyError, IOError, OSError, ValueError, RuntimeError, AttributeError) as e:
             print(f"Warning: Failed to save debug images: {e}")
