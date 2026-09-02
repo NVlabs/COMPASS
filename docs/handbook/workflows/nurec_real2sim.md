@@ -15,7 +15,7 @@ available.
 ### 1. Prepare prerequisites
 
 - Docker with the NVIDIA Container Toolkit.
-- An NVIDIA GPU + driver that satisfies the Isaac Sim 6.0.1 requirements.
+- An NVIDIA GPU + driver that satisfies the Isaac Sim 6.1 requirements.
 - A Hugging Face token with access to the COMPASS and NuRec assets.
 - The Hugging Face CLI on the host.
 
@@ -49,8 +49,6 @@ export HF_TOKEN=hf_xxx
 ```
 
 Use one `--nurec-scene <scene>` flag per scene.
-Pass `--nurec-revision <revision>` to download Hugging Face data from a
-specific branch, tag, commit, or PR ref.
 
 ```{note}
 You must accept the dataset terms on Hugging Face before downloading.
@@ -83,7 +81,6 @@ include:
 ```text
 nova_carter-galileo/
 ├── particle_spg-runtime.usdz  # Particle-field USD with SPG
-├── volume.usdz
 ├── occupancy_map.yaml
 ├── occupancy_map.png
 ```
@@ -91,8 +88,22 @@ nova_carter-galileo/
 Pass the scene folder name to `--nurec-scene`; COMPASS builds the NuRec scene
 config from that folder at runtime.
 
+Registered scenes:
+
+| `--nurec-scene` | Description |
+|---|---|
+| `nova_carter-galileo` | Galileo lab — aisles, shelves, boxes |
+| `nova_carter-cafe` | Cafe area — open area, natural lighting |
+| `nova_carter-wormhole` | Conference room |
+| `hand_hold-endeavor-andoria` | Meeting room, Endeavor building |
+| `hand_hold-endeavor-livingroom` | Living room, Endeavor building |
+| `hand_hold-endeavor-wormhole` | Conference room, Endeavor building |
+| `hand_hold-endeavor-wormhole-table` | Conference room (with table), Endeavor |
+| `hand_hold-voyager-babyboom` | Conference room, Voyager building |
+| `xgrid-wormhole` | Wormhole conference room with sim objects |
+
 ```{note}
-NuRec maps use a ROS bottom-left origin convention. COMPASS sets this by
+NuRec maps use a ROS bottom-left origin convention. The registry sets this by
 default; using the wrong convention leads to bad robot spawn locations.
 ```
 
@@ -115,7 +126,7 @@ python run.py \
     -b ./assets/x_mobility.ckpt \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
-    --num_envs 12 \
+    --num_envs 32 \
     --video \
     --video_interval 1 \
     --precompute_valid_poses
@@ -141,23 +152,25 @@ Key options:
   alias for `--environment`; assets must already be installed.
 - `--nurec-usd-file`: NuRec USD filename under the selected scene folder.
   Defaults to `particle_spg-runtime.usdz`; override it only when testing a
-  custom NuRec USD.
+  custom NuRec USD. For `xgrid-wormhole`, use
+  `stage_particle_with_sim_objects.usd`.
 - `--nurec-omap-file`: optional occupancy-map YAML filename under the selected
   scene folder. Omit it to use the scene default, usually
-  `occupancy_map.yaml`.
+  `occupancy_map.yaml`. For `xgrid-wormhole`, use
+  `occupancy_map_with_sim_objects.yaml`.
 - `--spg-runtime`: advanced override for custom SPG-runtime USDs. Usually omit
   it; COMPASS automatically enables SPG for `particle_spg-runtime.usdz` when
   `--nurec-scene` is set.
-- `--num_envs 12`: conservative default; increase only after checking VRAM.
+- `--num_envs 32`: set according to your VRAM.
 - `--precompute_valid_poses`: recommended for constrained Real2Sim scenes.
 - Debug dumps include `camera_grid_*.png` for robot-camera RGB/depth. With
   `--visualizer kit`, they also include `kit_viewport_*.png` plus
   `kit_viewport_*.png.txt` for the GUI viewport.
-- Use `--visualizer kit` to show third-person visualization, but it can be much
-  slower. Omit it for training.
+- Append `--visualizer kit` to show the third-person viewport. The viewport can
+  be an extremely novel view and is only used for visualization.
 
-Output checkpoints are written as `<output_dir>/model_<iter>.pt`; videos land
-in `<output_dir>/videos/`.
+Output checkpoints are written as `<output_dir>/model_<iter>.pt`; check
+`<output_dir>/videos/` for rollout videos.
 
 ```{note}
 Approximate per-GPU VRAM for `nova_carter-galileo` with Carter and a 320x512
@@ -199,10 +212,16 @@ python run.py \
     --nurec-scene nova_carter-galileo \
     --num_envs <num_envs> \
     --video \
-    --video_interval 1
+    --video_interval 1 \
+    --visualizer kit
 ```
 
 `<path/to/residual_policy_ckpt>` is usually `<output_dir>/model_<iter>.pt`.
+
+The key options above apply to evaluation mode as well.
+
+Omit `--visualizer kit` for faster evaluation without GUI. The viewport can be
+an extremely novel view and can have occlusion.
 
 ### 10. Export and deploy
 
@@ -252,7 +271,7 @@ python osmo/run_osmo.py train \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
     --nurec-usd-file particle_spg-runtime.usdz \
-    --num-envs 12 \
+    --num-envs 32 \
     --num-gpus 8
 ```
 
@@ -266,7 +285,7 @@ python osmo/run_osmo.py eval \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
     --nurec-usd-file particle_spg-runtime.usdz \
-    --num-envs 12
+    --num-envs 32
 ```
 
 OSMO runs are headless, so they do not produce the Kit perspective viewport.

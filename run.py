@@ -428,7 +428,7 @@ def run(
                                     or precompute_valid_orientations)
     env = RLESEnvWrapper(
         cfg=env_cfg,
-        render_mode="rgb_array" if record_video else None,
+        render_mode=None,
         precompute_valid_poses=precompute_flag,
         precompute_valid_orientations=precompute_orientations_flag,
     )
@@ -459,14 +459,13 @@ def run(
                 lambda step: step % (num_steps_per_iteration * args_cli.video_interval) == 0,
             "video_length":
                 num_steps_per_iteration,
-            "disable_logger":
-                True,
             "camera_sensor_name":
                 args_cli.camera_sensor_name,
+            "record_kit_viewport":
+                "kit" in requested_viz,
         }
-        # MultiCameraVideoRecorder wraps the viewport stream with gymnasium's
-        # RecordVideo internally and additionally records the onboard robot
-        # camera sensor to a separate "robot_camera/" sub-folder.
+        # MultiCameraVideoRecorder reads explicit camera streams and avoids the
+        # deprecated IsaacLab render_mode="rgb_array" / Gym RecordVideo path.
         env = MultiCameraVideoRecorder(env, **video_kwargs)
 
     # Setup the agent.

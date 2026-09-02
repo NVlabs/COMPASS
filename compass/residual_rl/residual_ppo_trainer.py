@@ -585,15 +585,27 @@ class ResidualPPOTrainer:
         # Video generation can be slower than this function call, so add one iteration
         # delay for video upload.
         target_iteration = iteration - 1
+        if target_iteration < 0:
+            return
+
         video_step = target_iteration * self.num_steps_per_env
-        target_video_path = os.path.join(self.output_dir, 'videos', 'robot_camera',
-                                         f'rl-video-step-{video_step}.mp4')
-        print(target_video_path)
-        if os.path.exists(target_video_path):
-            self.logger.log_video(name="episode_video",
-                                  video_path=target_video_path,
-                                  fps=16,
-                                  step=target_iteration)
+        video_filename = f'rl-video-step-{video_step}.mp4'
+        video_specs = [
+            ("robot_camera_episode_video",
+             os.path.join(self.output_dir, 'videos', 'robot_camera', video_filename)),
+            ("kit_viewport_episode_video",
+             os.path.join(self.output_dir, 'videos', 'kit_viewport', video_filename)),
+            ("combined_episode_video",
+             os.path.join(self.output_dir, 'videos', f'combined-{video_filename}')),
+        ]
+
+        for name, video_path in video_specs:
+            print(video_path)
+            if os.path.exists(video_path):
+                self.logger.log_video(name=name,
+                                      video_path=video_path,
+                                      fps=16,
+                                      step=target_iteration)
 
     def _save_debug_images(self, obs_dict, iteration, step):
         """Save debug images from all cameras as multiple grids during training."""
