@@ -93,7 +93,6 @@ Registered scenes:
 | `--nurec-scene` | Description |
 |---|---|
 | `nova_carter-galileo` | Galileo lab — aisles, shelves, boxes |
-| `nova_carter-cafe` | Cafe area — open area, natural lighting |
 | `nova_carter-wormhole` | Conference room |
 | `hand_hold-endeavor-andoria` | Meeting room, Endeavor building |
 | `hand_hold-endeavor-livingroom` | Living room, Endeavor building |
