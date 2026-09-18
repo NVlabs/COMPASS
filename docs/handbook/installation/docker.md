@@ -56,7 +56,8 @@ notes, the git workflow, and troubleshooting.
 
 ### `build`
 
-Builds `compass-rl:latest` (override the tag with `./docker/run.sh build mytag`).
+Builds `compass-rl:latest` from `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
+(override the COMPASS tag with `./docker/run.sh build mytag`).
 Re-running is fast because Docker layer-caches.
 
 ### `assets`
@@ -154,7 +155,7 @@ hooks live in the container, not on the host. So:
 
 ```
 docker/
-├── Dockerfile.rl            # Image: Isaac Lab 3.0-beta1 + COMPASS deps + python wrapper
+├── Dockerfile.rl            # Image: Isaac Lab 3.0.0-rc1 + COMPASS deps + python wrapper
 ├── Dockerfile.distillation  # Used by docker-only distillation runs (unrelated to dev env)
 ├── run.sh                   # build / assets / up / down / exec / shell / status
 ├── activate                 # source me: shim PATH + (compass-rl) prompt prefix

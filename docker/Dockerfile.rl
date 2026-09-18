@@ -1,6 +1,5 @@
-# Temporary internal Isaac Lab image from the private NGC registry.
-# Replace with public nvcr.io/nvidia/isaac-lab:<version> after the fix is released.
-FROM nvcr.io/0947644777160149/internal/isaac-lab:latest-release-3.0.0-119c17247c436f3d97c07dd26c7a52404d3dfc7c
+# Public Isaac Lab image shared by local Docker and OSMO RL workflows.
+FROM nvcr.io/nvidia/isaac-lab:3.0.0-rc1
 
 # Omniverse runtime env (required for any kit / pip step run as root in the container).
 ENV ACCEPT_EULA=Y

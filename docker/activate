@@ -127,6 +127,8 @@ fi
 
 exec docker exec \${docker_flags} \\
     -w "\${cont_pwd}" \\
+    -e "USER=\$(id -un)" \\
+    -e "LOGNAME=\$(id -un)" \\
     -e "WANDB_API_KEY=\${WANDB_API_KEY:-}" \\
     -e "HF_TOKEN=\${HF_TOKEN:-}" \\
     -e "DISPLAY=\${DISPLAY:-}" \\

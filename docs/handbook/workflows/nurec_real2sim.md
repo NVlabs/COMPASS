@@ -5,9 +5,8 @@ This guide shows how to train and deploy COMPASS navigation policies on
 cloud runs.
 
 ```{note}
-Validated on **Ubuntu 22.04** / **OVX with RTX**, using the temporary internal
-Isaac Lab 3.0 release image until the matching public Isaac Lab image is
-available.
+The workflow targets **Ubuntu 22.04** / **OVX with RTX** and uses the public
+Isaac Lab image `nvcr.io/nvidia/isaac-lab:3.0.0-rc1` as its Docker base.
 ```
 
 ## Docker workflow (recommended)
@@ -57,7 +56,7 @@ You must accept the dataset terms on Hugging Face before downloading.
 ### 4. Build and activate the container
 
 ```bash
-export COMPASS_IMAGE_TAG=isaaclab-3.0-ea
+export COMPASS_IMAGE_TAG=isaaclab-3.0.0-rc1
 
 ./docker/run.sh build
 source ./docker/activate
@@ -254,7 +253,9 @@ osmo login
 ```
 
 NuRec OSMO jobs download COMPASS USDs, the X-Mobility checkpoint, and the
-requested NuRec scene inside the workflow. When `--nurec-scene` is set, the
+requested NuRec scene inside the workflow. The launcher builds
+`docker/Dockerfile.rl` using the same `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
+base image as local Docker runs. When `--nurec-scene` is set, the
 workflow switches to the Real2Sim gin config and passes `--nurec-scene` and
 `--nurec-usd-file` to `run.py`. Use `--nurec-omap-file <filename>` when the
 workflow should use a non-default occupancy map. Omit `--nurec-revision` to use

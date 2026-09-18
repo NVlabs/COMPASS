@@ -78,16 +78,19 @@ _compass_run_args() {
         # the bind-mount so they survive `down` + `up`. Caches land in ./.cache/
         # which is gitignored.
         -e "HOME=${CONT_REPO_DIR}"
+        # Host users supplied by LDAP/SSSD may be absent from /etc/passwd.
+        # getpass.getuser() checks these before attempting a passwd lookup.
+        -e "USER=$(id -un)"
+        -e "LOGNAME=$(id -un)"
         -e "DISPLAY=${DISPLAY:-}"
         -e "WANDB_API_KEY=${WANDB_API_KEY:-}"
         -e "HF_TOKEN=${HF_TOKEN:-}"
         # Already ENV in Dockerfile.rl; redundant flags are harmless and explicit.
         -e "ACCEPT_EULA=Y"
         -e "OMNI_KIT_ALLOW_ROOT=1"
-        # Bind-mount host /etc/passwd + /etc/group read-only so the container
-        # resolves $(id -u)/$(id -g) to a real username. Without this, NSS
-        # lookups inside the container (huggingface_hub, getpass.getuser, …)
-        # fall over with "no passwd entry for uid …".
+        # Resolve local host accounts inside the container. Directory-service
+        # accounts may not appear in these files; USER/LOGNAME above cover
+        # environment-based username lookups such as getpass.getuser().
         -v "/etc/passwd:/etc/passwd:ro"
         -v "/etc/group:/etc/group:ro"
         --workdir "${CONT_REPO_DIR}"
@@ -176,14 +179,16 @@ cmd_exec() {
     # against a non-tty stdin errors with "cannot attach stdin to a TTY-enabled".
     local exec_flags="-i"
     if [ -t 0 ] && [ -t 1 ]; then exec_flags="-it"; fi
-    exec docker exec ${exec_flags} -w "${cont_pwd}" "${CONTAINER_NAME}" "$@"
+    exec docker exec ${exec_flags} -w "${cont_pwd}" \
+        -e "USER=$(id -un)" -e "LOGNAME=$(id -un)" "${CONTAINER_NAME}" "$@"
 }
 
 cmd_shell() {
     cmd_up >/dev/null
     local exec_flags="-i"
     if [ -t 0 ] && [ -t 1 ]; then exec_flags="-it"; fi
-    exec docker exec ${exec_flags} -w "${CONT_REPO_DIR}" "${CONTAINER_NAME}" bash
+    exec docker exec ${exec_flags} -w "${CONT_REPO_DIR}" \
+        -e "USER=$(id -un)" -e "LOGNAME=$(id -un)" "${CONTAINER_NAME}" bash
 }
 
 cmd_status() {
