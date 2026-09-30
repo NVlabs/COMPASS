@@ -8,6 +8,7 @@ msgpack==1.1.2
 numpy>=2.0,<2.8
 onnx==1.20.1
 onnxruntime-gpu==1.25.1
+opencv-python-headless==4.14.0.94
 pandas==3.0.1
 pytorch-lightning==2.6.1
 timm==1.0.26

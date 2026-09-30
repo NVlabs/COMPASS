@@ -189,6 +189,15 @@ elif args_cli.nurec_omap_file is not None:
     parser.error("--nurec-omap-file requires --nurec-scene.")
 apply_nurec_spg_kit_args(args_cli)
 
+if args_cli.video:
+    # Load the FFmpeg-enabled wheel before Kit prepends its bundled OpenCV to sys.path.
+    import cv2
+
+    if not cv2.videoio_registry.hasBackend(cv2.CAP_FFMPEG):
+        parser.error(
+            "--video requires FFmpeg-enabled OpenCV. Install requirements.txt and recreate "
+            f"the Docker container after rebuilding the image. Loaded OpenCV: {cv2.__file__}")
+
 # launch omniverse app
 app_launcher = AppLauncher(args_cli, enable_cameras=True)
 simulation_app = app_launcher.app
