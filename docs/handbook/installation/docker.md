@@ -26,7 +26,7 @@ Host shell  →  shim PATH  →  docker exec  →  daemon container
 
 `source ./docker/activate` brings up the container if it isn't already running,
 prepends a tmp shim dir to `PATH`, and rewrites your prompt to `(compass-rl)`.
-The shims (`python`, `pip`, `tensorboard`, `pytest`, `yapf`, `pylint`,
+The shims (`python`, `uv`, `pip`, `tensorboard`, `pytest`, `yapf`, `pylint`,
 `pre-commit`, …) each `docker exec` the same-named binary inside the container,
 with the host CWD translated to the container path. `deactivate` reverts.
 
@@ -155,7 +155,7 @@ hooks live in the container, not on the host. So:
 
 ```
 docker/
-├── Dockerfile.rl            # Image: Isaac Lab 3.0.0-rc1 + COMPASS deps + python wrapper
+├── Dockerfile.rl            # Image: Isaac Lab 3.0.0-rc1 + COMPASS and OV dependencies
 ├── Dockerfile.distillation  # Used by docker-only distillation runs (unrelated to dev env)
 ├── run.sh                   # build / assets / up / down / exec / shell / status
 ├── activate                 # source me: shim PATH + (compass-rl) prompt prefix

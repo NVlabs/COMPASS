@@ -62,7 +62,7 @@ export COMPASS_IMAGE_TAG=isaaclab-3.0.0-rc1
 source ./docker/activate
 ```
 
-After activation, `python`, `python3`, `pip`, `pytest`, and `isaaclab.sh` run
+After activation, `python`, `python3`, `uv`, `pip`, `pytest`, and `isaaclab.sh` run
 inside the COMPASS container. The repo remains editable on the host through the
 bind mount.
 
@@ -133,6 +133,37 @@ python run.py \
 This command uses the default `particle_spg-runtime.usdz`. Use
 `--nurec-usd-file <filename>` to choose another USD from the selected scene
 folder.
+
+#### Backend selection
+
+COMPASS supports the following camera renderer and physics backend combinations
+in Isaac Lab 3.0. Append the arguments to the training or evaluation command:
+
+| Camera renderer | Physics backend | Visualizer | Arguments |
+|---|---|---|---|
+| `isaac_rtx` (default) | `physx` (default) | Kit | `--visualizer kit` |
+| `isaac_rtx` (default) | `physx` (default) | None | `--visualizer none` |
+| `ovrtx` | `newton` (default for OVRTX, MJWarp solver) | None | `--camera-renderer ovrtx --visualizer none` |
+| `ovrtx` | `ovphysx` | None | `--camera-renderer ovrtx --physics-backend ovphysx --visualizer none` |
+
+COMPASS defaults to `isaac_rtx`, so pass `--camera-renderer ovrtx` to select OVRTX. For example:
+
+```bash
+python run.py \
+    -c configs/train_config_real2sim.gin \
+    -o <output_dir> \
+    -b ./assets/x_mobility.ckpt \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --num_envs 4 \
+    --camera-renderer ovrtx \
+    --visualizer none
+```
+
+Use `--physics-backend ovphysx` for Newton instead. OVRTX runs without starting
+Kit and does not support `--visualizer kit`.
+
+#### Visualization and common options
 
 | Kit viewport | Robot camera |
 |---|---|
@@ -215,8 +246,6 @@ python run.py \
 ```
 
 `<path/to/residual_policy_ckpt>` is usually `<output_dir>/model_<iter>.pt`.
-
-The key options above apply to evaluation mode as well.
 
 Omit `--visualizer kit` for faster evaluation without GUI. The viewport can be
 an extremely novel view and can have occlusion.

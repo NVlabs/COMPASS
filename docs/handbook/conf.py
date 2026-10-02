@@ -52,6 +52,7 @@ myst_enable_extensions = [
     "fieldlist",    # field lists
     "tasklist",    # GitHub-style task lists
     "attrs_inline",    # {.class} inline attribute syntax
+    "html_image",    # Process HTML img tags so Sphinx copies images and preserves widths.
 ]
 myst_fence_as_directive = {"mermaid"}
 myst_heading_anchors = 3
