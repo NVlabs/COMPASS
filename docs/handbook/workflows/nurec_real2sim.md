@@ -62,6 +62,13 @@ export COMPASS_IMAGE_TAG=isaaclab-3.0.0-rc1
 source ./docker/activate
 ```
 
+On Colossus, recreate the container with direct GPU-to-GPU transfers disabled to work around NCCL timeouts:
+
+```bash
+./docker/run.sh down
+NCCL_P2P_DISABLE=1 ./docker/run.sh up
+```
+
 After activation, `python`, `python3`, `uv`, `pip`, `pytest`, and `isaaclab.sh` run
 inside the COMPASS container. The repo remains editable on the host through the
 bind mount.

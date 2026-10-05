@@ -108,6 +108,26 @@ bind-mount, its own pre-commit cache, its own kit shader cache.
 
 ## Multi-GPU
 
+The launcher allocates 1 GB of `/dev/shm` and sets `memlock=-1` for NCCL shared
+and pinned host memory. Override the shared-memory capacity with
+`COMPASS_SHM_SIZE=2g ./docker/run.sh up` if needed. This is a capacity limit,
+not an up-front allocation of that much RAM.
+
+On Colossus, standalone eight-GPU broadcasts and all-reduce passed with 1 GB
+shared memory and `NCCL_P2P_DISABLE=1`; the same test with default P2P timed out.
+The launcher forwards this optional variable when creating the container:
+
+```bash
+# After stopping any training and preserving container-local changes:
+./docker/run.sh down
+NCCL_P2P_DISABLE=1 ./docker/run.sh up
+source ./docker/activate
+```
+
+Disabling P2P makes NCCL use other transports and can reduce training throughput.
+It is a Colossus workaround, not a default for all hosts. Only the standalone
+communication test has been verified with these settings, not full training.
+
 The container starts with `--gpus all` by default. To pin to specific GPUs,
 export `NVIDIA_VISIBLE_DEVICES` before bringing the container up:
 

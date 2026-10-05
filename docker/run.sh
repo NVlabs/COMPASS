@@ -61,6 +61,9 @@ _compass_run_args() {
         --name "${CONTAINER_NAME}"
         --gpus all
         --net=host
+        # NCCL's host-memory transport exceeds Docker's 64 MB shm default.
+        --shm-size "${COMPASS_SHM_SIZE:-1g}"
+        --ulimit memlock=-1
         --user "$(id -u):$(id -g)"
         # Isaac Sim's install at /isaac-sim is mode drwxr-x--- with group
         # `isaac-sim` (GID 1234 in the base image). Adding our host user to
@@ -96,6 +99,10 @@ _compass_run_args() {
         --workdir "${CONT_REPO_DIR}"
         --detach
     )
+    # Host-specific NCCL workaround; keep direct GPU transfers enabled by default.
+    if [[ -n "${NCCL_P2P_DISABLE:-}" ]]; then
+        args+=(-e "NCCL_P2P_DISABLE=${NCCL_P2P_DISABLE}")
+    fi
     printf '%s\n' "${args[@]}"
 }
 
@@ -114,9 +121,24 @@ cmd_assets() {
     "${REPO_ROOT}/docker/prepare_assets.sh" "$@"
 }
 
+_compass_log_nccl() {
+    # Read the container's setting, since `up` may reuse an existing container.
+    local p2p_disable
+    if ! p2p_disable=$(docker exec "${CONTAINER_NAME}" sh -c 'printf "%s" "${NCCL_P2P_DISABLE:-unset}"'); then
+        warn "Could not read the container's NCCL_P2P_DISABLE setting."
+        return 0
+    fi
+    if [[ "${p2p_disable}" == "1" ]]; then
+        info "NCCL P2P: disabled (NCCL_P2P_DISABLE=1)"
+    else
+        info "NCCL P2P: not disabled by environment (NCCL_P2P_DISABLE=${p2p_disable})"
+    fi
+}
+
 cmd_up() {
     if docker ps --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
         info "Container already running: ${CONTAINER_NAME}"
+        _compass_log_nccl
         return 0
     fi
     if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
@@ -124,6 +146,7 @@ cmd_up() {
         step "Restarting existing container: ${CONTAINER_NAME}"
         docker start "${CONTAINER_NAME}" >/dev/null
         info "Container running: ${CONTAINER_NAME}"
+        _compass_log_nccl
         return 0
     fi
 
@@ -145,6 +168,7 @@ cmd_up() {
     args+=(--entrypoint /bin/sleep)
     docker run "${args[@]}" "${IMAGE_NAME}" infinity >/dev/null
     info "Container running: ${CONTAINER_NAME}"
+    _compass_log_nccl
 }
 
 cmd_down() {

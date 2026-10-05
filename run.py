@@ -373,13 +373,14 @@ def run(
     else:
         logger = _NoOpLogger()
 
-    # Setup base policy. Pin DataParallel to the rank's GPU when distributed; let it
-    # span all visible GPUs in the single-process / single-GPU path (the legacy default).
+    # Keep policy inference on this run's GPU. Implicit DataParallel across every
+    # visible GPU can stall the first rollout on multi-GPU simulation hosts.
+    # Retain the wrapper's .module interface; torchrun assigns one GPU per rank.
+    policy_device = torch.device(device)
+    policy_device_ids = ([policy_device.index if policy_device.index is not None else
+                          torch.cuda.current_device()] if policy_device.type == "cuda" else None)
     base_policy = XMobilityBasePolicy(args_cli.base_policy_path)
-    if args_cli.distributed:
-        base_policy = torch.nn.DataParallel(base_policy, device_ids=[local_rank])
-    else:
-        base_policy = torch.nn.DataParallel(base_policy)
+    base_policy = torch.nn.DataParallel(base_policy, device_ids=policy_device_ids)
     base_policy.to(device)
     base_policy.eval()
 
@@ -387,11 +388,8 @@ def run(
     if args_cli.distillation_policy_path is not None:
         distillation_policy = ESDistillationPolicyWrapper(args_cli.distillation_policy_path,
                                                           embodiment)
-        if args_cli.distributed:
-            distillation_policy = torch.nn.DataParallel(distillation_policy,
-                                                        device_ids=[local_rank])
-        else:
-            distillation_policy = torch.nn.DataParallel(distillation_policy)
+        distillation_policy = torch.nn.DataParallel(distillation_policy,
+                                                    device_ids=policy_device_ids)
         distillation_policy.to(device)
         distillation_policy.eval()
     else:
