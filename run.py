@@ -377,8 +377,9 @@ def run(
     # visible GPU can stall the first rollout on multi-GPU simulation hosts.
     # Retain the wrapper's .module interface; torchrun assigns one GPU per rank.
     policy_device = torch.device(device)
-    policy_device_ids = ([policy_device.index if policy_device.index is not None else
-                          torch.cuda.current_device()] if policy_device.type == "cuda" else None)
+    policy_device_ids = ([
+        policy_device.index if policy_device.index is not None else torch.cuda.current_device()
+    ] if policy_device.type == "cuda" else None)
     base_policy = XMobilityBasePolicy(args_cli.base_policy_path)
     base_policy = torch.nn.DataParallel(base_policy, device_ids=policy_device_ids)
     base_policy.to(device)

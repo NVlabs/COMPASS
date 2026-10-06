@@ -77,10 +77,9 @@ def configure_renderer_runtime(args):
         "ovrtx": ("newton", "ovphysx"),
     }
     if physics_backend not in compatible_backends[args.camera_renderer]:
-        raise ValueError(
-            f"--camera-renderer {args.camera_renderer} does not support "
-            f"--physics-backend {physics_backend}; choose "
-            f"{', '.join(compatible_backends[args.camera_renderer])}.")
+        raise ValueError(f"--camera-renderer {args.camera_renderer} does not support "
+                         f"--physics-backend {physics_backend}; choose "
+                         f"{', '.join(compatible_backends[args.camera_renderer])}.")
     args.physics_backend = physics_backend
 
     if args.camera_renderer == "isaac_rtx":

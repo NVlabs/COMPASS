@@ -12,18 +12,21 @@ from compass.utils.renderer_utils import configure_renderer_runtime
 
 
 class RendererRuntimeTests(unittest.TestCase):
+    """Verify renderer startup configuration without loading simulation runtimes."""
 
     def make_args(self, **overrides):
-        args = dict(camera_renderer="ovrtx",
-                    physics_backend=None,
-                    nurec_scene="nova_carter-galileo",
-                    nurec_usd_file=PARTICLE_SPG_RUNTIME_USD_FILE,
-                    spg_runtime=False,
-                    visualizer=None,
-                    livestream=-1,
-                    kit_args="",
-                    experience="",
-                    xr=False)
+        args = {
+            "camera_renderer": "ovrtx",
+            "physics_backend": None,
+            "nurec_scene": "nova_carter-galileo",
+            "nurec_usd_file": PARTICLE_SPG_RUNTIME_USD_FILE,
+            "spg_runtime": False,
+            "visualizer": None,
+            "livestream": -1,
+            "kit_args": "",
+            "experience": "",
+            "xr": False,
+        }
         args.update(overrides)
         return SimpleNamespace(**args)
 
@@ -44,9 +47,10 @@ class RendererRuntimeTests(unittest.TestCase):
             self.assertEqual(os.environ["OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled"], "0")
 
     def test_incompatible_physics_rejected_before_runtime_configuration(self):
-        for renderer, backend in (("isaac_rtx", "ovphysx"), ("isaac_rtx", "newton"),
-                                  ("ovrtx", "physx")):
-            with self.subTest(renderer=renderer, backend=backend), patch.dict(os.environ, {}, clear=True):
+        for renderer, backend in (("isaac_rtx", "ovphysx"), ("isaac_rtx", "newton"), ("ovrtx",
+                                                                                      "physx")):
+            with self.subTest(renderer=renderer, backend=backend), patch.dict(os.environ, {},
+                                                                              clear=True):
                 args = self.make_args(camera_renderer=renderer, physics_backend=backend)
                 with self.assertRaisesRegex(ValueError, "does not support --physics-backend"):
                     configure_renderer_runtime(args)

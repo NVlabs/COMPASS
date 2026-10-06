@@ -153,6 +153,13 @@ in Isaac Lab 3.0. Append the arguments to the training or evaluation command:
 | `ovrtx` | `newton` (default for OVRTX, MJWarp solver) | None | `--camera-renderer ovrtx --visualizer none` |
 | `ovrtx` | `ovphysx` | None | `--camera-renderer ovrtx --physics-backend ovphysx --visualizer none` |
 
+```{note}
+**Known issue in the current NuRec setup:** OVRTX returns invalid depth in the
+tested COMPASS NuRec setup. The cause is still under investigation.
+Depth is not used by the default training configuration. Use `--camera-renderer isaac_rtx`
+for configurations that require depth observations.
+```
+
 COMPASS defaults to `isaac_rtx`, so pass `--camera-renderer ovrtx` to select OVRTX. For example:
 
 ```bash
@@ -167,8 +174,8 @@ python run.py \
     --visualizer none
 ```
 
-Use `--physics-backend ovphysx` for Newton instead. OVRTX runs without starting
-Kit and does not support `--visualizer kit`.
+Use `--physics-backend ovphysx` for standalone OvPhysX instead of Newton. OVRTX
+runs without starting Kit and does not support `--visualizer kit`.
 
 #### Visualization and common options
 
