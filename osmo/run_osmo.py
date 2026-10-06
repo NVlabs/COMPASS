@@ -123,6 +123,17 @@ def parse_args():
                         help="NuRec occupancy-map filename passed to run.py. "
                         "Empty uses run.py's default.")
 
+    def add_renderer(sp):
+        sp.add_argument("--camera-renderer",
+                        choices=("isaac_rtx", "ovrtx"),
+                        default="isaac_rtx",
+                        help="Camera renderer. OVRTX runs without Kit.")
+        sp.add_argument("--physics-backend",
+                        choices=("physx", "newton", "ovphysx"),
+                        default=None,
+                        help="Physics backend. Defaults to physx for Isaac RTX or "
+                        "newton (MJWarp) for OVRTX.")
+
     train = sub.add_parser("train", help="Submit residual RL training.")
     add_common(train)
     train.add_argument("--wandb-project",
@@ -144,6 +155,7 @@ def parse_args():
                        "distributed workflow YAML; the trainer's distributed code paths are "
                        "world_size-aware so num_gpus=1 also works as a single-rank run.")
     add_nurec(train)
+    add_renderer(train)
 
     evl = sub.add_parser("eval", help="Submit residual RL evaluation.")
     add_common(evl)
@@ -166,6 +178,7 @@ def parse_args():
                      default=32,
                      help="Number of Isaac Lab envs for evaluation.")
     add_nurec(evl)
+    add_renderer(evl)
 
     rec = sub.add_parser("record", help="Submit distillation-data recording.")
     add_common(rec)
@@ -188,7 +201,20 @@ def parse_args():
                      default="distillation_config",
                      help="Gin config name without .gin (default: distillation_config).")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.subcommand in ("train", "eval"):
+        compatible_backends = {
+            "isaac_rtx": ("physx",),
+            "ovrtx": ("newton", "ovphysx"),
+        }
+        backends = compatible_backends[args.camera_renderer]
+        if args.physics_backend is None:
+            args.physics_backend = backends[0]
+        elif args.physics_backend not in backends:
+            parser.error(f"--camera-renderer {args.camera_renderer} does not support "
+                         f"--physics-backend {args.physics_backend}; choose "
+                         f"{', '.join(backends)}.")
+    return args
 
 
 def get_credential(name: str, prompt: bool) -> str:
@@ -257,6 +283,8 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "image": image,
         "num_gpus": args.num_gpus,
         "num_envs": args.num_envs,
+        "camera_renderer": args.camera_renderer,
+        "physics_backend": args.physics_backend,
         "wandb_api_key": wandb_key,
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,
@@ -285,6 +313,8 @@ def cmd_eval(args, image: str, wandb_key: str, hf_token: str) -> None:
         "hf_token": hf_token,
         "checkpoint_artifact": args.checkpoint,
         "num_envs": args.num_envs,
+        "camera_renderer": args.camera_renderer,
+        "physics_backend": args.physics_backend,
         "distillation_ckpt_artifact": args.distillation_ckpt,
         "no_residual": "1" if args.no_residual else "",
         "embodiment": args.embodiment,

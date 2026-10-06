@@ -48,6 +48,15 @@ workflow:
         EMBODIMENT={{embodiment}}
         ENVIRONMENT={{environment}}
         NO_RESIDUAL={{no_residual}}
+        CAMERA_RENDERER="{{camera_renderer}}"
+        PHYSICS_BACKEND="{{physics_backend}}"
+        RENDERER_ARGS="--camera-renderer $CAMERA_RENDERER"
+        if [[ -n "$PHYSICS_BACKEND" ]]; then
+          RENDERER_ARGS+=" --physics-backend $PHYSICS_BACKEND"
+        fi
+        if [[ "$CAMERA_RENDERER" == "ovrtx" ]]; then
+          RENDERER_ARGS+=" --visualizer none"
+        fi
         NUREC_SCENE="{{nurec_scene}}"
         NUREC_REVISION="{{nurec_revision}}"
         NUREC_USD_FILE="{{nurec_usd_file}}"
@@ -106,7 +115,7 @@ workflow:
         fi
 
         # Launch evaluation.
-        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --video_interval 1 --num_envs {{num_envs}}"
+        CMD="${ISAACLAB_PATH}/isaaclab.sh -p run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $EVAL_CKPT -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --video_interval 1 --num_envs {{num_envs}} $RENDERER_ARGS"
 
         if [[ -n $EMBODIMENT ]]; then
             CMD+=" --embodiment $EMBODIMENT"
@@ -149,6 +158,8 @@ default-values:
   image: ""
   workflow_name: compass_rl_es
   num_envs: 32
+  camera_renderer: isaac_rtx
+  physics_backend: ""
   no_residual: ""
   distillation_ckpt_artifact: ""
   embodiment: ""

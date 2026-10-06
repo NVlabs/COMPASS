@@ -61,6 +61,15 @@ workflow:
         EMBODIMENT={{embodiment}}
         ENVIRONMENT={{environment}}
         NO_RESIDUAL={{no_residual}}
+        CAMERA_RENDERER="{{camera_renderer}}"
+        PHYSICS_BACKEND="{{physics_backend}}"
+        RENDERER_ARGS="--camera-renderer $CAMERA_RENDERER"
+        if [[ -n "$PHYSICS_BACKEND" ]]; then
+          RENDERER_ARGS+=" --physics-backend $PHYSICS_BACKEND"
+        fi
+        if [[ "$CAMERA_RENDERER" == "ovrtx" ]]; then
+          RENDERER_ARGS+=" --visualizer none"
+        fi
         NUREC_SCENE="{{nurec_scene}}"
         NUREC_REVISION="{{nurec_revision}}"
         NUREC_USD_FILE="{{nurec_usd_file}}"
@@ -119,7 +128,7 @@ workflow:
         # spawns its own Isaac Sim instance + env; gradients sync via manual
         # all-reduce in PPO.update. Total parallel envs = {{num_gpus}} *
         # num_envs. NuRec assets are memory-heavy, so tune --num-envs per GPU.
-        TRAIN_CMD="python -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c $TRAIN_CONFIG -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --num_envs {{num_envs}}"
+        TRAIN_CMD="python -m torch.distributed.run --nproc_per_node={{num_gpus}} run.py --distributed -c $TRAIN_CONFIG -o $OUTPUT_DIR -n {{wandb_project_name}} -r {{wandb_run_name}} --logger wandb --video --num_envs {{num_envs}} $RENDERER_ARGS"
 
         if [[ -n $EMBODIMENT ]]; then
           TRAIN_CMD+=" --embodiment $EMBODIMENT"
@@ -154,7 +163,7 @@ workflow:
         # fine for a one-shot eval at the end of training.
         eval_ckpt=$(ls $OUTPUT_DIR/model_*.pt | sort -V | tail -n 1)
         ckpt_name=$(basename "$eval_ckpt")
-        EVAL_CMD="python run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --video --video_interval 1 --num_envs {{num_envs}}"
+        EVAL_CMD="python run.py -c $EVAL_CONFIG -o $OUTPUT_DIR -p $eval_ckpt -n {{wandb_project_name}} -r eval_{{wandb_run_name}}_$ckpt_name --logger wandb --video --video_interval 1 --num_envs {{num_envs}} $RENDERER_ARGS"
         if [[ -z $NO_RESIDUAL ]]; then
           EVAL_CMD+=" -b ./model.ckpt"
         fi
@@ -193,6 +202,8 @@ default-values:
   workflow_name: compass_rl_es_train
   num_gpus: 8
   num_envs: 32
+  camera_renderer: isaac_rtx
+  physics_backend: ""
   no_residual: ""
   resume_ckpt_artifact: ""
   embodiment: ""
