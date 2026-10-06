@@ -3,12 +3,13 @@
 """Renderer startup contracts that can be checked without Isaac Sim or a GPU."""
 
 import os
+import sys
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from compass.utils.nurec_utils import PARTICLE_SPG_RUNTIME_USD_FILE
-from compass.utils.renderer_utils import configure_renderer_runtime
+from compass.utils.renderer_utils import _configure_ovrtx_device, configure_renderer_runtime
 
 
 class RendererRuntimeTests(unittest.TestCase):
@@ -116,6 +117,53 @@ class RendererRuntimeTests(unittest.TestCase):
         configured = args.kit_args
         configure_renderer_runtime(args)
         self.assertEqual(args.kit_args, configured)
+
+
+class OVRTXDeviceTests(unittest.TestCase):
+    """Check the native config boundary without importing GPU libraries."""
+
+    def setUp(self):
+        self.native_config = Mock(side_effect=lambda **kwargs: SimpleNamespace(**kwargs))
+        self.adapter = SimpleNamespace(RendererConfig=self.native_config)
+        self.ovrtx = SimpleNamespace(RendererConfig=self.native_config)
+        self.torch = SimpleNamespace(device=Mock(),
+                                     cuda=SimpleNamespace(current_device=Mock(return_value=3)))
+        self.modules = patch.dict(
+            sys.modules, {
+                "torch": self.torch,
+                "ovrtx": self.ovrtx,
+                "isaaclab_ov.renderers": SimpleNamespace(ovrtx_renderer=self.adapter),
+            })
+        self.modules.start()
+        self.addCleanup(self.modules.stop)
+
+    def test_each_rank_pins_native_initialization(self):
+        # LOCAL_RANK is already resolved into sim.device by run.py. Do not remap
+        # it through CUDA_VISIBLE_DEVICES or use the multi-node global rank.
+        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "4,5,6,7", "RANK": "11"}):
+            for index in range(4):
+                with self.subTest(index=index):
+                    self.torch.device.return_value = SimpleNamespace(type="cuda", index=index)
+                    _configure_ovrtx_device(f"cuda:{index}")
+                    config = self.adapter.RendererConfig(log_file_path="renderer.log",
+                                                         keep_system_alive=True)
+                    self.assertEqual(config.active_cuda_gpus, str(index))
+                    self.assertEqual(config.log_file_path, "renderer.log")
+                    self.assertTrue(config.keep_system_alive)
+        self.torch.cuda.current_device.assert_not_called()
+        self.assertIs(self.ovrtx.RendererConfig, self.native_config)
+
+    def test_bare_cuda_uses_current_device(self):
+        self.torch.device.return_value = SimpleNamespace(type="cuda", index=None)
+        _configure_ovrtx_device("cuda")
+        self.assertEqual(self.adapter.RendererConfig().active_cuda_gpus, "3")
+
+    def test_cpu_rejected_before_changing_adapter(self):
+        self.torch.device.return_value = SimpleNamespace(type="cpu", index=None)
+        with self.assertRaisesRegex(ValueError, "requires a CUDA device"):
+            _configure_ovrtx_device("cpu")
+        self.assertIs(self.adapter.RendererConfig, self.native_config)
+        self.native_config.assert_not_called()
 
 
 if __name__ == "__main__":

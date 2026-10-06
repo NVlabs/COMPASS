@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+from functools import partial
 
 from compass.utils.nurec_utils import uses_nurec_spg_runtime
 from compass.utils.visualizer_utils import (
@@ -112,6 +113,8 @@ def apply_camera_renderer_settings(env_cfg, args):
         return
 
     from isaaclab_ov.renderers import OVRTXRendererCfg
+
+    _configure_ovrtx_device(env_cfg.sim.device)
 
     # Both choices run without Isaac Sim's Kit-based PhysX runtime.
     if args.physics_backend == "ovphysx":
@@ -251,6 +254,25 @@ def configure_nurec_isaacsim_rtx_viewport(nurec_usd_path, spg_runtime, quiet=Fal
 
 
 # Private helpers
+def _configure_ovrtx_device(device):
+    """Bind native OVRTX initialization to the simulation's CUDA device."""
+    import torch
+    from isaaclab_ov.renderers import ovrtx_renderer
+    from ovrtx import RendererConfig
+
+    device = torch.device(device)
+    if device.type != "cuda":
+        raise ValueError("--camera-renderer ovrtx requires a CUDA device.")
+    index = device.index if device.index is not None else torch.cuda.current_device()
+    # Isaac Lab 3.0.0-rc1 does not expose active_cuda_gpus in OVRTXRendererCfg.
+    # Its render-product device is assigned AFTER native renderer creation, too
+    # late to prevent every torchrun rank from initializing the default GPU.
+    # Adapt only Isaac Lab's config factory, including the shader-cache init path;
+    # leave the public ovrtx.RendererConfig untouched. Use CUDA-visible ordinals,
+    # which native OVRTX translates to Vulkan devices itself.
+    ovrtx_renderer.RendererConfig = partial(RendererConfig, active_cuda_gpus=str(index))
+
+
 def _render_product_camera_path(render_product_prim):
     """Return the first camera target from a RenderProduct relationship."""
     from pxr import UsdRender

@@ -428,16 +428,15 @@ def run(
 
     requested_viz = requested_visualizers(args_cli)
     configure_visualizers(env_cfg, requested_viz)
+    # Set the device before configuring OVRTX's native renderer initialization.
+    if args_cli.distributed or args_cli.camera_renderer == "ovrtx":
+        env_cfg.sim.device = device
     apply_camera_renderer_settings(env_cfg, args_cli)
 
     # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
     # rollouts collected by each rank explore different states (matches Isaac Lab's
     # rsl_rl reference pattern).
     env_cfg.seed = seed + global_rank
-
-    # Keep physics and rendering on the policy device for Kit-less and distributed runs.
-    if args_cli.distributed or args_cli.camera_renderer == "ovrtx":
-        env_cfg.sim.device = device
 
     # Set collision distances and max resample trial from gin config
     env_cfg.commands.goal_pose.collision_distance = goal_pose_collision_distance
