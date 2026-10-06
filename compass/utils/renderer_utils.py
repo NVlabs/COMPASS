@@ -24,11 +24,13 @@ from compass.utils.visualizer_utils import (
 # pylint: disable=import-outside-toplevel
 
 ###############################
-# Isaac Sim RTX Renderer Setup
+# Camera Renderer Setup
 ###############################
 __all__ = [
+    "apply_camera_renderer_settings",
     "apply_isaac_rtx_camera_renderer_settings",
     "apply_nurec_spg_kit_args",
+    "configure_renderer_runtime",
     "configure_nurec_isaacsim_rtx_viewport",
 ]
 
@@ -65,6 +67,77 @@ NUREC_IDENTITY_EXPOSURE = {
 
 
 # Public API
+def configure_renderer_runtime(args):
+    """Configure renderer startup before importing the simulation environment."""
+    physics_backend = getattr(args, "physics_backend", None)
+    if physics_backend is None:
+        physics_backend = "physx" if args.camera_renderer == "isaac_rtx" else "newton"
+    compatible_backends = {
+        "isaac_rtx": ("physx",),
+        "ovrtx": ("newton", "ovphysx"),
+    }
+    if physics_backend not in compatible_backends[args.camera_renderer]:
+        raise ValueError(f"--camera-renderer {args.camera_renderer} does not support "
+                         f"--physics-backend {physics_backend}; choose "
+                         f"{', '.join(compatible_backends[args.camera_renderer])}.")
+    args.physics_backend = physics_backend
+
+    if args.camera_renderer == "isaac_rtx":
+        apply_nurec_spg_kit_args(args)
+        return
+
+    from compass.utils.visualizer_utils import requested_visualizers
+
+    if "kit" in requested_visualizers(args):
+        raise ValueError(
+            "--camera-renderer ovrtx requires a Kit-less process; remove --visualizer kit.")
+    livestream = getattr(args, "livestream", -1)
+    if livestream is None or livestream < 0:
+        livestream = int(os.environ.get("LIVESTREAM", "0"))
+    if livestream or getattr(args, "xr", False):
+        raise ValueError("--camera-renderer ovrtx does not support Kit livestreaming or XR.")
+    if getattr(args, "kit_args", None) or getattr(args, "experience", None):
+        raise ValueError("--camera-renderer ovrtx does not use --kit_args or --experience.")
+
+    args.spg_runtime = uses_nurec_spg_runtime(args)
+    # AUTO_ANY ISP requests HDR even before a scene's PPISP shader is discovered.
+    # Match ppisp_camera_ovrtx.py; retain explicit user overrides.
+    os.environ.setdefault("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", "0")
+
+
+def apply_camera_renderer_settings(env_cfg, args):
+    """Select the camera renderer and its compatible physics backend."""
+    if args.camera_renderer == "isaac_rtx":
+        apply_isaac_rtx_camera_renderer_settings(env_cfg, True, args.spg_runtime)
+        return
+
+    from isaaclab_ov.renderers import OVRTXRendererCfg
+
+    # Both choices run without Isaac Sim's Kit-based PhysX runtime.
+    if args.physics_backend == "ovphysx":
+        from isaaclab_ov.physics import OvPhysxCfg
+
+        env_cfg.sim.physics = OvPhysxCfg()
+    else:
+        from isaaclab_newton.physics import NewtonCfg
+        from isaaclab_newton.physics.mjwarp_manager_cfg import MJWarpSolverCfg
+
+        solver_cfg = MJWarpSolverCfg()
+        if getattr(args, "nurec_scene", None):
+            # NuRec scenes contain concave triangle-mesh colliders. MuJoCo's
+            # mesh contacts push Carter out of the room; use Newton contacts.
+            solver_cfg.use_mujoco_contacts = False
+            # Mesh contacts can exceed MuJoCo's initial-pose capacity estimate.
+            # Reserve per-world contacts and room for their friction constraints.
+            solver_cfg.nconmax = 256
+            solver_cfg.njmax = 2048
+        env_cfg.sim.physics = NewtonCfg(solver_cfg=solver_cfg, num_substeps=1)
+    env_cfg.scene.camera.renderer_cfg = OVRTXRendererCfg()
+    # OVRTX receives camera transforms through Camera._update_poses; keep the
+    # onboard camera attached to the robot after resets and physics steps.
+    env_cfg.scene.camera.update_latest_camera_pose = True
+
+
 def apply_isaac_rtx_camera_renderer_settings(env_cfg, isaac_rtx, spg_runtime):
     """Apply Isaac RTX camera renderer settings when the Isaac RTX renderer is used."""
     if not isaac_rtx:

@@ -60,6 +60,7 @@ _COMPASS_SHIM_DIR="$(mktemp -d "${TMPDIR:-/tmp}/compass-shims.XXXXXX")"
 # Shimmed commands. To add another tool, append it here — no other wiring needed.
 _compass_shim_cmds=(
     python python3
+    uv
     pip pip3
     isaaclab.sh
     tensorboard

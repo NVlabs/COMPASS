@@ -23,8 +23,8 @@ from isaaclab.app import AppLauncher
 
 from compass.utils.nurec_utils import PARTICLE_SPG_RUNTIME_USD_FILE
 from compass.utils.renderer_utils import (
-    apply_isaac_rtx_camera_renderer_settings,
-    apply_nurec_spg_kit_args,
+    apply_camera_renderer_settings,
+    configure_renderer_runtime,
     configure_nurec_isaacsim_rtx_viewport,
 )
 from compass.utils.visualizer_utils import (
@@ -35,6 +35,19 @@ from compass.utils.visualizer_utils import (
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="COMPASS Mobility Generalist.")
+parser.add_argument(
+    "--camera-renderer",
+    choices=["isaac_rtx", "ovrtx"],
+    default="isaac_rtx",
+    help="Camera renderer. OVRTX runs without Kit; select physics with --physics-backend.",
+)
+parser.add_argument(
+    "--physics-backend",
+    choices=["physx", "newton", "ovphysx"],
+    default=None,
+    help="Physics backend. Defaults to physx for Isaac RTX or newton (MJWarp) for OVRTX. "
+    "Standalone ovphysx requires --camera-renderer ovrtx.",
+)
 parser.add_argument(
     "--config-files",
     "-c",
@@ -142,7 +155,7 @@ parser.add_argument(
     "--spg-runtime",
     action="store_true",
     default=False,
-    help="Force SPG runtime Kit args before Isaac Sim starts. "
+    help="Force SPG runtime renderer settings before simulation starts. "
     f"This is automatic for {PARTICLE_SPG_RUNTIME_USD_FILE} "
     "when --nurec-scene is set.",
 )
@@ -187,7 +200,10 @@ if args_cli.nurec_scene is not None:
     args_cli.environment = args_cli.nurec_scene
 elif args_cli.nurec_omap_file is not None:
     parser.error("--nurec-omap-file requires --nurec-scene.")
-apply_nurec_spg_kit_args(args_cli)
+try:
+    configure_renderer_runtime(args_cli)
+except ValueError as exc:
+    parser.error(str(exc))
 
 if args_cli.video:
     # Load the FFmpeg-enabled wheel before Kit prepends its bundled OpenCV to sys.path.
@@ -198,9 +214,25 @@ if args_cli.video:
             "--video requires FFmpeg-enabled OpenCV. Install requirements.txt and recreate "
             f"the Docker container after rebuilding the image. Loaded OpenCV: {cv2.__file__}")
 
-# launch omniverse app
-app_launcher = AppLauncher(args_cli, enable_cameras=True)
-simulation_app = app_launcher.app
+# OVRTX must never construct AppLauncher, even for headless runs.
+app_launcher = None
+simulation_app = None
+if args_cli.camera_renderer == "isaac_rtx":
+    app_launcher = AppLauncher(args_cli, enable_cameras=True)
+    simulation_app = app_launcher.app
+else:
+    try:
+        import ovrtx
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "OVRTX requires Isaac Lab's optional ovrtx dependencies. "
+            "Install the ovrtx extra and run with the Kit-less Python environment.") from exc
+    ovrtx.register_schema_paths()
+    AppLauncher.sync_visualizer_cli_settings_to_carb({
+        **vars(args_cli),
+        "visualizer_disable_all":
+            getattr(args_cli, "visualizer_explicit", False) and not args_cli.visualizer,
+    })
 
 import gin
 import torch
@@ -302,14 +334,12 @@ def run(
     num_rerenders_on_reset=None,
 ):
 
-    # Multi-GPU distributed setup. With `--distributed`, AppLauncher (already invoked
-    # at module load) reads LOCAL_RANK / RANK / WORLD_SIZE from torchrun's env, sets
-    # physics/active GPU per rank, and limits CPU threads. We still need to call
-    # init_process_group ourselves before any cross-rank op (param broadcast in
-    # ResidualPPOTrainer.__init__, gradient all-reduce in PPO.update).
+    # Kit-less runs read torchrun ranks directly because AppLauncher is skipped.
     if args_cli.distributed:
-        local_rank = app_launcher.local_rank
-        global_rank = app_launcher.global_rank
+        local_rank = (app_launcher.local_rank if app_launcher is not None else int(
+            os.environ.get("LOCAL_RANK", "0")))
+        global_rank = (app_launcher.global_rank if app_launcher is not None else int(
+            os.environ.get("RANK", "0")))
         # Pin PyTorch's current CUDA device to this rank's GPU BEFORE
         # init_process_group / any object-collective. NCCL's object
         # collectives (dist.all_gather_object in _save_episode_logs)
@@ -326,7 +356,8 @@ def run(
     else:
         local_rank = 0
         global_rank = 0
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = (args_cli.device if args_cli.camera_renderer == "ovrtx" else
+                  "cuda" if torch.cuda.is_available() else "cpu")
         is_rank_zero = True
 
     # Setup logger. Only rank 0 writes TensorBoard / W&B / artifacts; other ranks get
@@ -342,13 +373,15 @@ def run(
     else:
         logger = _NoOpLogger()
 
-    # Setup base policy. Pin DataParallel to the rank's GPU when distributed; let it
-    # span all visible GPUs in the single-process / single-GPU path (the legacy default).
+    # Keep policy inference on this run's GPU. Implicit DataParallel across every
+    # visible GPU can stall the first rollout on multi-GPU simulation hosts.
+    # Retain the wrapper's .module interface; torchrun assigns one GPU per rank.
+    policy_device = torch.device(device)
+    policy_device_ids = ([
+        policy_device.index if policy_device.index is not None else torch.cuda.current_device()
+    ] if policy_device.type == "cuda" else None)
     base_policy = XMobilityBasePolicy(args_cli.base_policy_path)
-    if args_cli.distributed:
-        base_policy = torch.nn.DataParallel(base_policy, device_ids=[local_rank])
-    else:
-        base_policy = torch.nn.DataParallel(base_policy)
+    base_policy = torch.nn.DataParallel(base_policy, device_ids=policy_device_ids)
     base_policy.to(device)
     base_policy.eval()
 
@@ -356,11 +389,8 @@ def run(
     if args_cli.distillation_policy_path is not None:
         distillation_policy = ESDistillationPolicyWrapper(args_cli.distillation_policy_path,
                                                           embodiment)
-        if args_cli.distributed:
-            distillation_policy = torch.nn.DataParallel(distillation_policy,
-                                                        device_ids=[local_rank])
-        else:
-            distillation_policy = torch.nn.DataParallel(distillation_policy)
+        distillation_policy = torch.nn.DataParallel(distillation_policy,
+                                                    device_ids=policy_device_ids)
         distillation_policy.to(device)
         distillation_policy.eval()
     else:
@@ -398,21 +428,15 @@ def run(
 
     requested_viz = requested_visualizers(args_cli)
     configure_visualizers(env_cfg, requested_viz)
-    apply_isaac_rtx_camera_renderer_settings(
-        env_cfg,
-        isaac_rtx=True,
-        spg_runtime=args_cli.spg_runtime,
-    )
+    apply_camera_renderer_settings(env_cfg, args_cli)
 
     # Setup seed. Per-rank offset diversifies env initial conditions across GPUs so
     # rollouts collected by each rank explore different states (matches Isaac Lab's
     # rsl_rl reference pattern).
     env_cfg.seed = seed + global_rank
 
-    # Pin PhysX + Isaac Sim's render device to this rank's GPU. Without this every
-    # rank's env_cfg.sim.device defaults to cuda:0 and all 8 sims pile onto a single
-    # GPU (caught with a Vulkan OOM during material loading on the first attempt).
-    if args_cli.distributed:
+    # Keep physics and rendering on the policy device for Kit-less and distributed runs.
+    if args_cli.distributed or args_cli.camera_renderer == "ovrtx":
         env_cfg.sim.device = device
 
     # Set collision distances and max resample trial from gin config
@@ -513,6 +537,7 @@ def run(
     logger.log_config(gin_config_to_dictionary(gin.config._OPERATIVE_CONFIG))
 
     logger.close()
+    env.close()
 
 
 def main():
@@ -540,6 +565,8 @@ def main():
 
 if __name__ == "__main__":
     # Run the main function.
-    main()
-    # Close the sim app.
-    simulation_app.close()
+    try:
+        main()
+    finally:
+        if simulation_app is not None:
+            simulation_app.close()
