@@ -64,6 +64,8 @@ _compass_run_args() {
         # NCCL's host-memory transport exceeds Docker's 64 MB shm default.
         --shm-size "${COMPASS_SHM_SIZE:-1g}"
         --ulimit memlock=-1
+        # RTX shared-memory handles and video recording also consume file descriptors.
+        --ulimit nofile=65536:65536
         --user "$(id -u):$(id -g)"
         # Isaac Sim's install at /isaac-sim is mode drwxr-x--- with group
         # `isaac-sim` (GID 1234 in the base image). Adding our host user to
