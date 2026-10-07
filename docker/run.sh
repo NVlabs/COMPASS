@@ -54,9 +54,12 @@ step()    { echo -e "${BLUE}[STEP]${NC} $*"; }
 # assets, so we only add X11 socket forwarding and the kit shader cache.
 # ──────────────────────────────────────────────────────────────────────────────
 CONT_REPO_DIR="/workspace/COMPASS"
+# Isaac Lab mirrors remote assets under tempfile.gettempdir(); image /tmp caches
+# may be root-owned. Keep each host user's downloads writable and persistent.
+REPO_TMP_DIR=".cache/compass/tmp-$(id -u)"
 
 _compass_run_args() {
-    mkdir -p "${KIT_CACHE_DIR}" "${KIT_DATA_DIR}"
+    mkdir -p "${KIT_CACHE_DIR}" "${KIT_DATA_DIR}" "${REPO_ROOT}/${REPO_TMP_DIR}"
     local args=(
         --name "${CONTAINER_NAME}"
         --gpus all
@@ -83,6 +86,7 @@ _compass_run_args() {
         # the bind-mount so they survive `down` + `up`. Caches land in ./.cache/
         # which is gitignored.
         -e "HOME=${CONT_REPO_DIR}"
+        -e "TMPDIR=${CONT_REPO_DIR}/${REPO_TMP_DIR}"
         # Host users supplied by LDAP/SSSD may be absent from /etc/passwd.
         # getpass.getuser() checks these before attempting a passwd lookup.
         -e "USER=$(id -un)"
