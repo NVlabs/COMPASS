@@ -56,11 +56,21 @@ You must accept the dataset terms on Hugging Face before downloading.
 ### 4. Build and activate the container
 
 ```bash
-export COMPASS_IMAGE_TAG=isaaclab-3.0.0-rc1
+# Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0-rc1.
+export COMPASS_BASE_IMAGE="<isaac-lab-image>"
+```
+
+```bash
+# Choose a tag matching your base image version, such as isaaclab-3.0.0-rc1.
+# Used to build compass-rl:<tag> and select it when launching the container.
+export COMPASS_IMAGE_TAG="<compass-image-tag>"
 
 ./docker/run.sh build
 source ./docker/activate
 ```
+
+If a container already exists for this checkout, run `./docker/run.sh down`
+after rebuilding and before activation so the new image is used.
 
 On Colossus, recreate the container with direct GPU-to-GPU transfers disabled to work around NCCL timeouts:
 
@@ -310,8 +320,9 @@ osmo login
 
 NuRec OSMO jobs download COMPASS USDs, the X-Mobility checkpoint, and the
 requested NuRec scene inside the workflow. The launcher builds
-`docker/Dockerfile.rl` using the same `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
-base image as local Docker runs. When `--nurec-scene` is set, the
+`docker/Dockerfile.rl` using its default `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
+base image. The `COMPASS_BASE_IMAGE` environment override above is handled by
+`docker/run.sh`; the OSMO launcher does not forward it. When `--nurec-scene` is set, the
 workflow switches to the Real2Sim gin config and passes `--nurec-scene` and
 `--nurec-usd-file` to `run.py`. Use `--nurec-omap-file <filename>` when the
 workflow should use a non-default occupancy map. Omit `--nurec-revision` to use

@@ -57,8 +57,29 @@ notes, the git workflow, and troubleshooting.
 ### `build`
 
 Builds `compass-rl:latest` from `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
-(override the COMPASS tag with `./docker/run.sh build mytag`).
+by default. `COMPASS_BASE_IMAGE` selects the full Isaac Lab base image reference
+(registry, repository, and tag or digest). `COMPASS_IMAGE_TAG` names the resulting
+COMPASS image; an explicit `./docker/run.sh build mytag` overrides that output tag.
 Re-running is fast because Docker layer-caches.
+
+To build against another compatible Isaac Lab image:
+
+```bash
+# Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0-rc1.
+export COMPASS_BASE_IMAGE="<isaac-lab-image>"
+# Choose a tag matching your base image version, such as isaaclab-3.0.0-rc1 (default: latest).
+# Used to build compass-rl:<tag> and select it when launching the container.
+export COMPASS_IMAGE_TAG="<compass-image-tag>"
+./docker/run.sh build
+```
+
+Authenticate to the base image's registry first if it requires login. Leaving
+`COMPASS_BASE_IMAGE` unset or empty uses the Dockerfile default. For a direct
+Docker build, pass `--build-arg COMPASS_BASE_IMAGE=<image-reference>`.
+
+If a COMPASS container already exists for this checkout, recreate it after the
+build with `./docker/run.sh down` followed by `./docker/run.sh up`. Keep
+`COMPASS_IMAGE_TAG` exported when starting or activating the container.
 
 ### `assets`
 

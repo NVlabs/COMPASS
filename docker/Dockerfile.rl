@@ -1,5 +1,6 @@
-# Public Isaac Lab image shared by local Docker and OSMO RL workflows.
-FROM nvcr.io/nvidia/isaac-lab:3.0.0-rc1
+# Default Isaac Lab image shared by local Docker and OSMO RL workflows.
+ARG COMPASS_BASE_IMAGE=nvcr.io/nvidia/isaac-lab:3.0.0-rc1
+FROM ${COMPASS_BASE_IMAGE}
 
 # Omniverse runtime env (required for any kit / pip step run as root in the container).
 ENV ACCEPT_EULA=Y

@@ -5,7 +5,7 @@
 # Manage the COMPASS docker dev container.
 #
 # Usage:
-#   ./docker/run.sh build [tag]               # build the image (default tag: latest)
+#   ./docker/run.sh build [tag]               # build; COMPASS_BASE_IMAGE overrides the base image
 #   ./docker/run.sh assets [--hf-token TOK]   # download USDs + X-Mobility ckpt to ./assets
 #                         [--nurec-scene SCENE]  # also download a NuRec scene folder
 #   ./docker/run.sh up                        # idempotent: start daemon container if not running
@@ -117,9 +117,14 @@ _compass_run_args() {
 # ──────────────────────────────────────────────────────────────────────────────
 cmd_build() {
     local tag="${1:-${IMAGE_TAG}}"
+    local build_args=()
+    # Leave the default in Dockerfile.rl so direct Docker builds use it too.
+    if [[ -n "${COMPASS_BASE_IMAGE:-}" ]]; then
+        build_args+=(--build-arg "COMPASS_BASE_IMAGE=${COMPASS_BASE_IMAGE}")
+    fi
     step "Building ${IMAGE_NAME/:*/:${tag}} from docker/Dockerfile.rl"
     cd "${REPO_ROOT}"
-    docker build --network=host -f docker/Dockerfile.rl -t "compass-rl:${tag}" .
+    docker build --network=host -f docker/Dockerfile.rl "${build_args[@]}" -t "compass-rl:${tag}" .
     info "Build complete: compass-rl:${tag}"
 }
 
