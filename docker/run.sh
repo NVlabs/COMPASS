@@ -38,6 +38,8 @@ KIT_CACHE_DIR="${HOME}/.cache/compass/kit"
 # writable by our host-uid user, so Kit spams PermissionError on every launch.
 # Mounting a host-uid-owned dir over it silences the noise.
 KIT_DATA_DIR="${HOME}/.cache/compass/kit-data"
+# Newer Isaac Lab images enable Omniverse Hub with an image-owned cache.
+HUB_CACHE_DIR="${HOME}/.cache/compass/hub"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Output helpers (lifted from ros2_deployment/prepare_assets.sh).
@@ -59,7 +61,7 @@ CONT_REPO_DIR="/workspace/COMPASS"
 REPO_TMP_DIR=".cache/compass/tmp-$(id -u)"
 
 _compass_run_args() {
-    mkdir -p "${KIT_CACHE_DIR}" "${KIT_DATA_DIR}" "${REPO_ROOT}/${REPO_TMP_DIR}"
+    mkdir -p "${KIT_CACHE_DIR}" "${KIT_DATA_DIR}" "${HUB_CACHE_DIR}" "${REPO_ROOT}/${REPO_TMP_DIR}"
     local args=(
         --name "${CONTAINER_NAME}"
         --gpus all
@@ -82,6 +84,7 @@ _compass_run_args() {
         -v "/tmp/.X11-unix:/tmp/.X11-unix:rw"
         -v "${KIT_CACHE_DIR}:/isaac-sim/kit/cache"
         -v "${KIT_DATA_DIR}:/isaac-sim/kit/data"
+        -v "${HUB_CACHE_DIR}:/var/cache/hub"
         # HOME=/workspace/COMPASS puts pip / pre-commit / huggingface caches under
         # the bind-mount so they survive `down` + `up`. Caches land in ./.cache/
         # which is gitignored.

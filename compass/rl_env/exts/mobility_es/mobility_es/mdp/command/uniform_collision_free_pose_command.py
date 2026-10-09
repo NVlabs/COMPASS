@@ -70,7 +70,11 @@ class UniformCollisionFreePoseCommand(commands.UniformPose2dCommand):
         msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
         return msg
 
-    def _resample_command(self, env_ids: Sequence[int]):
+    def _resample_command(self, env_ids: Sequence[int] | slice | None):
+        # New Isaac Lab command managers pass a slice for full resets.
+        if env_ids is None or isinstance(env_ids, slice):
+            selection = slice(None) if env_ids is None else env_ids
+            env_ids = torch.arange(self._env.num_envs, device=self.device)[selection]
         # Check if precomputed goal poses are available
         if self.collision_checker.has_precomputed_goal_poses():
             # Use precomputed valid locations (these are in world coordinates)

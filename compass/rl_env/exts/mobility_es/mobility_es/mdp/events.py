@@ -64,7 +64,7 @@ def sample_root_state_uniform(env: RLESEnvWrapper,
 
 
 def reset_root_state_uniform_collision_free(env: RLESEnvWrapper,
-                                            env_ids: torch.Tensor,
+                                            env_ids: torch.Tensor | slice | None,
                                             pose_range: dict[str, tuple[float, float]],
                                             velocity_range: dict[str, tuple[float, float]],
                                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
@@ -72,6 +72,11 @@ def reset_root_state_uniform_collision_free(env: RLESEnvWrapper,
                                             collision_distance=0.75):
     # extract the used quantities (to enable type-hinting)
     asset = env.scene[asset_cfg.name]
+    # Isaac Lab uses slice(None) for a full reset. Sampling and collision
+    # resampling below need explicit IDs, including for partial slice resets.
+    if env_ids is None or isinstance(env_ids, slice):
+        selection = slice(None) if env_ids is None else env_ids
+        env_ids = torch.arange(env.num_envs, device=asset.device)[selection]
 
     # Check if precomputed start poses are available
     if env.collision_checker.is_initialized() and env.collision_checker.has_precomputed_start_poses(

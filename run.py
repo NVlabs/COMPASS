@@ -31,6 +31,7 @@ from compass.utils.visualizer_utils import (
     configure_kit_scene_partition,
     configure_visualizers,
     requested_visualizers,
+    sync_visualizer_cli_settings,
 )
 
 # add argparse arguments
@@ -228,11 +229,7 @@ else:
             "OVRTX requires Isaac Lab's optional ovrtx dependencies. "
             "Install the ovrtx extra and run with the Kit-less Python environment.") from exc
     ovrtx.register_schema_paths()
-    AppLauncher.sync_visualizer_cli_settings_to_carb({
-        **vars(args_cli),
-        "visualizer_disable_all":
-            getattr(args_cli, "visualizer_explicit", False) and not args_cli.visualizer,
-    })
+    sync_visualizer_cli_settings(args_cli)
 
 import gin
 import torch
@@ -334,12 +331,10 @@ def run(
     num_rerenders_on_reset=None,
 ):
 
-    # Kit-less runs read torchrun ranks directly because AppLauncher is skipped.
+    # New launchers no longer expose ranks; torchrun provides them in the environment.
     if args_cli.distributed:
-        local_rank = (app_launcher.local_rank if app_launcher is not None else int(
-            os.environ.get("LOCAL_RANK", "0")))
-        global_rank = (app_launcher.global_rank if app_launcher is not None else int(
-            os.environ.get("RANK", "0")))
+        local_rank = getattr(app_launcher, "local_rank", int(os.environ.get("LOCAL_RANK", "0")))
+        global_rank = getattr(app_launcher, "global_rank", int(os.environ.get("RANK", "0")))
         # Pin PyTorch's current CUDA device to this rank's GPU BEFORE
         # init_process_group / any object-collective. NCCL's object
         # collectives (dist.all_gather_object in _save_episode_logs)

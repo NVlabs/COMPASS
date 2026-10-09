@@ -153,52 +153,8 @@ folder.
 
 #### Backend selection
 
-COMPASS supports three renderer/physics combinations in Isaac Lab 3.0:
-
-| Camera renderer | Physics backend |
-|---|---|
-| Isaac RTX (`isaac_rtx`) | PhysX (`physx`) |
-| OVRTX (`ovrtx`) | Newton with MJWarp (`newton`) |
-| OVRTX (`ovrtx`) | Standalone OvPhysX (`ovphysx`) |
-
 **Isaac RTX + PhysX is the default.** No backend flags are needed. Add
 `--visualizer kit` for a Kit viewport or `--visualizer none` to disable visualization.
-
-**OVRTX + Newton:** append these flags to the training or evaluation command.
-Newton is the default physics backend for OVRTX.
-
-```bash
---camera-renderer ovrtx --visualizer none
-```
-
-**OVRTX + OvPhysX:** select the physics backend explicitly.
-
-```bash
---camera-renderer ovrtx --physics-backend ovphysx --visualizer none
-```
-
-OVRTX runs without starting Kit and does not support `--visualizer kit`.
-
-```{note}
-**Known issue in the current NuRec setup:** OVRTX returns invalid depth in the
-tested COMPASS NuRec setup. The cause is still under investigation.
-Depth is not used by the default training configuration. Use `--camera-renderer isaac_rtx`
-for configurations that require depth observations.
-```
-
-For example, run OVRTX with its default Newton backend:
-
-```bash
-python run.py \
-    -c configs/train_config_real2sim.gin \
-    -o <output_dir> \
-    -b ./assets/x_mobility.ckpt \
-    --embodiment carter \
-    --nurec-scene nova_carter-galileo \
-    --num_envs 4 \
-    --camera-renderer ovrtx \
-    --visualizer none
-```
 
 #### Visualization and common options
 
