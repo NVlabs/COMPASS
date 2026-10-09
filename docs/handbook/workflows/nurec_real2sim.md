@@ -77,6 +77,20 @@ After activation, `python`, `python3`, `uv`, `pip`, `pytest`, and `isaaclab.sh` 
 inside the COMPASS container. The repo remains editable on the host through the
 bind mount.
 
+The Python and pip wrappers use Isaac Lab's selected environment, including
+the virtual environment supplied by internal `latest-release-3.0.0` images.
+For an internal image, set `COMPASS_BASE_IMAGE` to its full registry reference
+and choose a separate `COMPASS_IMAGE_TAG` before building.
+
+```{note}
+Isaac RTX + PhysX was smoke-tested on 2026-10-09 with the public
+`3.0.0-rc1` and internal `latest-release-3.0.0` image environments.
+Each test used Carter in `nova_carter-galileo`, two environments on one RTX
+A6000, and one PPO update after a 32-step rollout. Both produced robot-camera
+RGB/depth debug grids, a 32-frame video, and checkpoints. This checks rendering
+and a short training run; it does not validate long runs or multi-GPU training.
+```
+
 ### 5. Verify scene placement
 
 Each NuRec scene should live at:
@@ -145,7 +159,7 @@ This command uses the default `particle_spg-runtime.usdz`. Use
 `--nurec-usd-file <filename>` to choose another USD from the selected scene
 folder.
 
-#### Backend selection
+#### Renderer and visualization
 
 **Isaac RTX + PhysX is the default.** No backend flags are needed. Add
 `--visualizer kit` for a Kit viewport or `--visualizer none` to disable visualization.
