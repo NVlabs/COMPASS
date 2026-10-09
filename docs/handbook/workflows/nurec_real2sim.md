@@ -30,7 +30,7 @@ python3 -m pip install --user -U 'huggingface_hub[cli]'
 git clone https://github.com/NVlabs/COMPASS.git
 cd COMPASS
 git fetch
-git checkout real2sim/isaaclab_3.0
+git checkout real2sim/isaaclab_3.0_ovrtx
 ```
 
 ### 3. Download assets and checkpoints
@@ -165,11 +165,57 @@ This command uses the default `particle_spg-runtime.usdz`. Use
 `--nurec-usd-file <filename>` to choose another USD from the selected scene
 folder.
 
-#### Renderer and visualization
+#### Backend selection
 
-Training uses Isaac RTX cameras with PhysX. No backend flags are needed.
-Add `--visualizer kit` for a Kit viewport or `--visualizer none` to disable
-the viewport while keeping robot-camera rendering enabled.
+COMPASS supports three renderer/physics combinations in Isaac Lab 3.0:
+
+| Camera renderer | Physics backend |
+|---|---|
+| Isaac RTX (`isaac_rtx`) | PhysX (`physx`) |
+| OVRTX (`ovrtx`) | Newton with MJWarp (`newton`) |
+| OVRTX (`ovrtx`) | Standalone OvPhysX (`ovphysx`) |
+
+**Isaac RTX + PhysX is the default.** No backend flags are needed. Add
+`--visualizer kit` for a Kit viewport or `--visualizer none` to disable visualization.
+
+**OVRTX + Newton:** append these flags to the training or evaluation command.
+Newton is the default physics backend for OVRTX.
+
+```bash
+--camera-renderer ovrtx --visualizer none
+```
+
+**OVRTX + OvPhysX:** select the physics backend explicitly.
+
+```bash
+--camera-renderer ovrtx --physics-backend ovphysx --visualizer none
+```
+
+OVRTX runs without starting Kit and does not support `--visualizer kit`.
+
+```{note}
+**Known issue in the current NuRec setup:** OVRTX returns invalid depth in the
+tested COMPASS NuRec setup. The cause is still under investigation.
+The internal `latest-release-3.0.0` image also produced black RGB and infinite
+depth in the 2026-10-09 OVRTX + Newton smoke test, despite completing a PPO
+update. That combination is not ready for camera-based training.
+Depth is not used by the default training configuration. Use `--camera-renderer isaac_rtx`
+for configurations that require depth observations.
+```
+
+For example, run OVRTX with its default Newton backend:
+
+```bash
+python run.py \
+    -c configs/train_config_real2sim.gin \
+    -o <output_dir> \
+    -b ./assets/x_mobility.ckpt \
+    --embodiment carter \
+    --nurec-scene nova_carter-galileo \
+    --num_envs 4 \
+    --camera-renderer ovrtx \
+    --visualizer none
+```
 
 #### Visualization and common options
 
