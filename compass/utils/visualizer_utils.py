@@ -22,6 +22,7 @@ __all__ = [
     "configure_kit_scene_partition",
     "configure_visualizers",
     "requested_visualizers",
+    "sync_visualizer_cli_settings",
 ]
 
 # Kit/Newton Visualizer Defaults
@@ -32,6 +33,34 @@ KIT_VIEWER_LOOKAT = (0.0, 0.0, 0.35)
 
 
 # Public API
+def sync_visualizer_cli_settings(args):
+    """Publish Kit-less CLI settings across Isaac Lab launcher API versions."""
+    from isaaclab.app import AppLauncher
+
+    legacy_sync = getattr(AppLauncher, "sync_visualizer_cli_settings_to_carb", None)
+    if legacy_sync is not None:
+        legacy_sync({
+            **vars(args),
+            "visualizer_disable_all":
+                getattr(args, "visualizer_explicit", False) and not args.visualizer,
+        })
+        return
+
+    from isaaclab.app.settings_manager import get_settings_manager
+
+    # New launchers distinguish an omitted selection (None) from --viz none ([]).
+    visualizers = getattr(args, "visualizer", None)
+    max_visible_envs = getattr(args, "max_visible_envs", None)
+    if max_visible_envs is not None and int(max_visible_envs) < 0:
+        raise ValueError("--max_visible_envs must be non-negative.")
+    settings = get_settings_manager()
+    settings.set("/isaaclab/visualizer/types", " ".join(requested_visualizers(args)))
+    settings.set("/isaaclab/visualizer/explicit", visualizers is not None)
+    settings.set("/isaaclab/visualizer/disable_all", visualizers == [])
+    settings.set("/isaaclab/visualizer/max_visible_envs",
+                 -1 if max_visible_envs is None else int(max_visible_envs))
+
+
 def requested_visualizers(args):
     """Return normalized visualizer names from CLI arguments."""
     requested_viz = getattr(args, "visualizer", None) or []
