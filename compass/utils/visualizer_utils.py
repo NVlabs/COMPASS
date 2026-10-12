@@ -19,6 +19,7 @@
 __all__ = [
     "KIT_PERSPECTIVE_CAMERA_PATH",
     "KIT_SCENE_PARTITION",
+    "configure_camera_marker_updates",
     "configure_kit_scene_partition",
     "configure_visualizers",
     "requested_visualizers",
@@ -75,6 +76,25 @@ def configure_visualizers(env_cfg, requested_viz):
         _configure_newton_visualizer(env_cfg)
     if "kit" in requested_viz:
         _configure_kit_visualizer(env_cfg)
+
+
+def configure_camera_marker_updates(sim):
+    """Refresh debug markers before camera-only Isaac RTX rendering."""
+    if not sim.get_setting("/isaaclab/render/rtx_sensors"):
+        return
+
+    def update_markers(event):
+        # Isaac Lab dispatches these callbacks through active visualizers only.
+        # Camera-only runs still create USD markers, initially at the origin.
+        if any(viz.supports_markers()
+               or (viz.supports_live_plots() and getattr(viz.cfg, "enable_live_plots", True))
+               for viz in sim.visualizers):
+            return
+        sim.vis_marker_registry.dispatch_callbacks(event)
+
+    # The PhysX headless Kit pump runs at order -10. Update USD before that pump
+    # so reset goals are already in place when the camera captures its frame.
+    sim.add_render_callback("compass_camera_markers", update_markers, order=-20)
 
 
 # Private Helpers

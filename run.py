@@ -28,6 +28,7 @@ from compass.utils.renderer_utils import (
     configure_nurec_isaacsim_rtx_viewport,
 )
 from compass.utils.visualizer_utils import (
+    configure_camera_marker_updates,
     configure_kit_scene_partition,
     configure_visualizers,
     requested_visualizers,
@@ -459,6 +460,7 @@ def run(
         precompute_valid_poses=precompute_flag,
         precompute_valid_orientations=precompute_orientations_flag,
     )
+    configure_camera_marker_updates(env.sim)
     if "kit" in requested_viz:
         if args_cli.nurec_scene is not None:
             configure_nurec_isaacsim_rtx_viewport(
