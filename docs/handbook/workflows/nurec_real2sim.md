@@ -72,7 +72,8 @@ source ./docker/activate
 If a container already exists for this checkout, run `./docker/run.sh down`
 after rebuilding and before activation so the new image is used.
 
-On Colossus, recreate the container with direct GPU-to-GPU transfers disabled to work around NCCL timeouts:
+If you encounter NCCL timeouts, try recreating the container with direct
+GPU-to-GPU transfers disabled:
 
 ```bash
 ./docker/run.sh down
