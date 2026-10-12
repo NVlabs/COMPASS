@@ -4,11 +4,6 @@ This guide shows how to train and deploy COMPASS navigation policies on
 **NuRec Real2Sim** assets in Isaac Lab. Use Docker for local runs and OSMO for
 cloud runs.
 
-```{note}
-The workflow targets **Ubuntu 22.04** / **OVX with RTX** and uses the public
-Isaac Lab image `nvcr.io/nvidia/isaac-lab:3.0.0-rc1` as its Docker base.
-```
-
 ## Docker workflow (recommended)
 
 ### 1. Prepare prerequisites
@@ -55,6 +50,12 @@ You must accept the dataset terms on Hugging Face before downloading.
 
 ### 4. Build and activate the container
 
+Tested Isaac Lab images:
+
+| Isaac Lab version | Docker image | Tested GPUs | Known issues |
+|---|---|---|---|
+| 3.0 EA | `nvcr.io/nvidia/isaac-lab:3.0.0-rc1` | L40, A40, RTX PRO 6000 Blackwell | Intermittent crashes during training. |
+
 ```bash
 # Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0-rc1.
 export COMPASS_BASE_IMAGE="<isaac-lab-image>"
@@ -71,14 +72,6 @@ source ./docker/activate
 
 If a container already exists for this checkout, run `./docker/run.sh down`
 after rebuilding and before activation so the new image is used.
-
-If you encounter NCCL timeouts, try recreating the container with direct
-GPU-to-GPU transfers disabled:
-
-```bash
-./docker/run.sh down
-NCCL_P2P_DISABLE=1 ./docker/run.sh up
-```
 
 After activation, `python`, `python3`, `uv`, `pip`, `pytest`, and `isaaclab.sh` run
 inside the COMPASS container. The repo remains editable on the host through the
@@ -223,6 +216,32 @@ python -m torch.distributed.run --nproc_per_node=<N> \
 `--num_envs` is per GPU. Run headless for multi-GPU by omitting
 `--visualizer kit`. Rank 0 owns logging, checkpoints, and video.
 
+#### L40 rendering benchmark
+
+Setup: 8 × L40 (48 GB), 32 envs/GPU; Carter in Galileo with
+`particle_spg-runtime.usdz`, Isaac RTX + PhysX, 512 × 320 camera.
+Sim rates (not wall-clock throughput): physics/policy/rendering = 200/10/40 Hz.
+
+Mean iteration wall time on rank 0 (256 policy steps + PPO update/setup):
+
+| Component | Time | Share |
+|---|---|---|
+| Rendering | 156.3 s | 45.1% |
+| Base policy | 68.4 s | 19.7% |
+| Physics | 52.3 s | 15.1% |
+| RGB observations | 31.9 s | 9.2% |
+| PPO update | 18.9 s | 5.5% |
+| Other | 19.2 s | 5.5% |
+| **Total** | **347 s** | **100%** |
+
+Rendering time per 32-env batch on rank 0:
+
+| Unit | Mean time |
+|---|---|
+| Render call | ≤ 153 ms |
+| Policy step (4 renders) | 611 ms |
+| Rollout (256 steps) | 156.3 s |
+
 ### 9. Evaluate
 
 ```bash
@@ -326,3 +345,10 @@ Use W&B videos and robot-camera debug images for run inspection. Add
   NuRec scenes should use `bottom-left`.
 - **CUDA OOM:** lower `--num_envs`; NuRec scenes are memory-heavy, and
   `--num_envs` is per GPU when distributed.
+- **NCCL timeouts during multi-GPU training:** try recreating the container
+  with NCCL peer-to-peer transfers disabled:
+
+  ```bash
+  ./docker/run.sh down
+  NCCL_P2P_DISABLE=1 ./docker/run.sh up
+  ```
