@@ -14,6 +14,8 @@ from compass.utils.ovrtx_render_product import apply_gaussian_hdr
 
 @unittest.skipIf(Usd is None, 'Requires OpenUSD')
 class RenderProductHDRTests(unittest.TestCase):
+    """Verify HDR overrides preserve the render product's USD configuration."""
+
     def test_hdr_setting_preserves_layer_and_camera_relationships(self):
         text = '''#usda 1.0
 (defaultPrim = "RenderCamera_0")
@@ -25,15 +27,16 @@ def Scope "RenderCamera_0" {
 }
 '''
         for override, expected in [('0', False), ('1', True)]:
-            with self.subTest(override=override), patch.dict(os.environ, {
-                    'OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled': override}):
+            with self.subTest(override=override), patch.dict(
+                    os.environ, {'OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled': override}):
                 layer = Sdf.Layer.CreateAnonymous()
                 layer.ImportFromString(apply_gaussian_hdr(text))
                 stage = Usd.Stage.Open(layer)
                 self.assertEqual(str(stage.GetDefaultPrim().GetPath()), '/RenderCamera_0')
                 product = stage.GetPrimAtPath('/RenderCamera_0/RenderProduct')
-                self.assertEqual(product.GetRelationship('camera').GetTargets(),
-                                 [Sdf.Path('/World/envs/env_0/Camera')])
+                self.assertEqual(
+                    product.GetRelationship('camera').GetTargets(),
+                    [Sdf.Path('/World/envs/env_0/Camera')])
                 self.assertEqual(tuple(product.GetAttribute('resolution').Get()), (512, 320))
                 attr = product.GetAttribute('omni:rtx:rtpt:gaussian:skipTonemapping:enabled')
                 self.assertEqual(attr.GetTypeName(), Sdf.ValueTypeNames.Bool)

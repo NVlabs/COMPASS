@@ -17,6 +17,9 @@
 from functools import wraps
 import os
 
+# Import simulation dependencies only after renderer startup is configured.
+# pylint: disable=import-outside-toplevel
+
 
 def configure_gaussian_hdr(enabled):
     """Mirror the Gaussian tonemapping environment override into each product.
@@ -54,11 +57,11 @@ def apply_gaussian_hdr(usd_text):
     if not layer.ImportFromString(usd_text):
         raise RuntimeError('Could not parse OVRTX render-product layer')
     stage = Usd.Stage.Open(layer)
-    skip = os.environ.get('OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled', '0').lower() in {
-        '1', 'true', 'yes', 'on'
-    }
+    skip = os.environ.get('OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled',
+                          '0').lower() in {'1', 'true', 'yes', 'on'}
     for prim in stage.Traverse():
         if prim.GetTypeName() == 'RenderProduct':
             prim.CreateAttribute('omni:rtx:rtpt:gaussian:skipTonemapping:enabled',
-                                 Sdf.ValueTypeNames.Bool, custom=False).Set(skip)
+                                 Sdf.ValueTypeNames.Bool,
+                                 custom=False).Set(skip)
     return layer.ExportToString()
