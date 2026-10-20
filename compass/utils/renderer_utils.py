@@ -101,9 +101,6 @@ def configure_renderer_runtime(args):
         raise ValueError("--camera-renderer ovrtx does not use --kit_args or --experience.")
 
     args.spg_runtime = uses_nurec_spg_runtime(args)
-    # AUTO_ANY ISP requests HDR even before a scene's PPISP shader is discovered.
-    # Match ppisp_camera_ovrtx.py; retain explicit user overrides.
-    os.environ.setdefault("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", "0")
 
 
 def apply_camera_renderer_settings(env_cfg, args):
@@ -115,6 +112,10 @@ def apply_camera_renderer_settings(env_cfg, args):
     from isaaclab_ov.renderers import OVRTXRendererCfg
 
     _configure_ovrtx_device(env_cfg.sim.device)
+    from compass.utils.ovrtx_render_product import configure_gaussian_hdr
+
+    configure_gaussian_hdr(
+        bool(getattr(args, "nurec_scene", None)) and bool(getattr(args, "spg_runtime", False)))
 
     # Both choices run without Isaac Sim's Kit-based PhysX runtime.
     if args.physics_backend == "ovphysx":
