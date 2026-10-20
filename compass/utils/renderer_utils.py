@@ -101,9 +101,6 @@ def configure_renderer_runtime(args):
         raise ValueError("--camera-renderer ovrtx does not use --kit_args or --experience.")
 
     args.spg_runtime = uses_nurec_spg_runtime(args)
-    # AUTO_ANY ISP requests HDR even before a scene's PPISP shader is discovered.
-    # Match ppisp_camera_ovrtx.py; retain explicit user overrides.
-    os.environ.setdefault("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", "0")
 
 
 def apply_camera_renderer_settings(env_cfg, args):

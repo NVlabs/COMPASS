@@ -15,25 +15,20 @@
 # limitations under the License.
 
 from functools import wraps
-import os
 
 # Import simulation dependencies only after renderer startup is configured.
 # pylint: disable=import-outside-toplevel
 
 
 def configure_gaussian_hdr(enabled):
-    """Mirror the Gaussian tonemapping environment override into each product.
+    """Configure each NuRec SPG render product for the PPISP HDR input.
 
-    Isaac Lab's OVRTX 0.5 path creates render products separately from the scene.
-    The environment override alone does not supply their Gaussian HDR setting.
+    Author the required Gaussian setting directly in USD without debug-only
+    environment variables. The newer integration builds products separately.
     Keep the adapter local to Isaac Lab and leave the native OVRTX API unchanged.
     """
     from isaaclab_ov.renderers import ovrtx_renderer
 
-    # The backend owner and separate render-product layers arrived with the
-    # new integration. Older integrations retain their existing startup path.
-    if not hasattr(ovrtx_renderer, 'OVRTXBackend'):
-        return
     key = '_compass_original_build_render_product_as_string'
     if not hasattr(ovrtx_renderer, key):
         setattr(ovrtx_renderer, key, ovrtx_renderer.build_render_product_as_string)
@@ -44,7 +39,13 @@ def configure_gaussian_hdr(enabled):
 
     @wraps(original)
     def build_with_gaussian_hdr(*args, **kwargs):
-        return apply_gaussian_hdr(original(*args, **kwargs))
+        result = original(*args, **kwargs)
+        # Older Isaac Lab builders return the layer and product path together;
+        # newer builders return only the layer. Preserve either interface.
+        if isinstance(result, tuple):
+            usd_text, product_path = result
+            return apply_gaussian_hdr(usd_text), product_path
+        return apply_gaussian_hdr(result)
 
     ovrtx_renderer.build_render_product_as_string = build_with_gaussian_hdr
 
@@ -57,11 +58,9 @@ def apply_gaussian_hdr(usd_text):
     if not layer.ImportFromString(usd_text):
         raise RuntimeError('Could not parse OVRTX render-product layer')
     stage = Usd.Stage.Open(layer)
-    skip = os.environ.get('OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled',
-                          '0').lower() in {'1', 'true', 'yes', 'on'}
     for prim in stage.Traverse():
         if prim.GetTypeName() == 'RenderProduct':
             prim.CreateAttribute('omni:rtx:rtpt:gaussian:skipTonemapping:enabled',
                                  Sdf.ValueTypeNames.Bool,
-                                 custom=False).Set(skip)
+                                 custom=False).Set(False)
     return layer.ExportToString()
