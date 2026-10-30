@@ -50,20 +50,24 @@ You must accept the dataset terms on Hugging Face before downloading.
 
 ### 4. Build and activate the container
 
-Tested Isaac Lab images:
+Choose the Isaac Lab Docker base image for your camera renderer:
 
-| Isaac Lab version | Docker image | Tested GPUs | Known issues |
+| Isaac Lab version | `COMPASS_BASE_IMAGE` | Renderer selection | Known limitations |
 |---|---|---|---|
-| 3.0 EA | `nvcr.io/nvidia/isaac-lab:3.0.0-rc1` | L40, A40, RTX PRO 6000 Blackwell | Intermittent crashes during training. |
+| 3.0 EA | `nvcr.io/nvidia/isaac-lab:3.0.0-rc1` | `isaac_rtx` | Intermittent crash during training. |
+| 3.0 GA | `nvcr.io/nvidia/isaac-lab:3.0.0` | `isaac_rtx` | - |
+| 3.0 GA | `nvcr.io/nvidia/isaac-lab:3.0.0-kitless` | `ovrtx` | OVRTX returns invalid depth |
+
+The `3.0.0-rc1` image was tested on L40, A40, and RTX PRO 6000 Blackwell GPUs.
 
 ```bash
-# Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0-rc1.
+# Example for Isaac RTX: export COMPASS_BASE_IMAGE="nvcr.io/nvidia/isaac-lab:3.0.0"
 export COMPASS_BASE_IMAGE="<isaac-lab-image>"
 ```
 
 ```bash
-# Choose a tag matching your base image version, such as isaaclab-3.0.0-rc1.
-# Used to build compass-rl:<tag> and select it when launching the container.
+# Example for Isaac Lab 3.0.0: export COMPASS_IMAGE_TAG="isaaclab-3.0.0"
+# Builds compass-rl:isaaclab-3.0.0 and selects it when launching the container.
 export COMPASS_IMAGE_TAG="<compass-image-tag>"
 
 ./docker/run.sh build
@@ -76,20 +80,6 @@ after rebuilding and before activation so the new image is used.
 After activation, `python`, `python3`, `uv`, `pip`, `pytest`, and `isaaclab.sh` run
 inside the COMPASS container. The repo remains editable on the host through the
 bind mount.
-
-The Python and pip wrappers use Isaac Lab's selected environment, including
-the virtual environment supplied by internal `latest-release-3.0.0` images.
-For an internal image, set `COMPASS_BASE_IMAGE` to its full registry reference
-and choose a separate `COMPASS_IMAGE_TAG` before building.
-
-```{note}
-Isaac RTX + PhysX was smoke-tested on 2026-10-09 with the public
-`3.0.0-rc1` and internal `latest-release-3.0.0` image environments.
-Each test used Carter in `nova_carter-galileo`, two environments on one RTX
-A6000, and one PPO update after a 32-step rollout. Both produced robot-camera
-RGB/depth debug grids, a 32-frame video, and checkpoints. This checks rendering
-and a short training run; it does not validate long runs or multi-GPU training.
-```
 
 ### 5. Verify scene placement
 
@@ -131,6 +121,8 @@ default; using the wrong convention leads to bad robot spawn locations.
 ```
 
 ### 6. Test the setup
+
+For Isaac RTX only, verify the setup with a Kit viewport:
 
 ```bash
 cd compass/rl_env
@@ -186,16 +178,6 @@ Newton is the default physics backend for OVRTX.
 ```
 
 OVRTX runs without starting Kit and does not support `--visualizer kit`.
-
-```{note}
-**Known issue in the current NuRec setup:** OVRTX returns invalid depth in the
-tested COMPASS NuRec setup. The cause is still under investigation.
-The internal `latest-release-3.0.0` image also produced black RGB and infinite
-depth in the 2026-10-09 OVRTX + Newton smoke test, despite completing a PPO
-update. That combination is not ready for camera-based training.
-Depth is not used by the default training configuration. Use `--camera-renderer isaac_rtx`
-for configurations that require depth observations.
-```
 
 For example, run OVRTX with its default Newton backend:
 

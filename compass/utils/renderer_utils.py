@@ -116,6 +116,12 @@ def apply_camera_renderer_settings(env_cfg, args):
 
     configure_gaussian_hdr(
         bool(getattr(args, "nurec_scene", None)) and bool(getattr(args, "spg_runtime", False)))
+    if getattr(args, "nurec_scene", None):
+        from isaaclab_ov.renderers import ovrtx_renderer
+
+        from compass.utils.ovrtx_usd import export_stage_to_binary_sublayer
+
+        ovrtx_renderer.export_stage_to_string = export_stage_to_binary_sublayer
 
     # Both choices run without Isaac Sim's Kit-based PhysX runtime.
     if args.physics_backend == "ovphysx":
