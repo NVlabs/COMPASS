@@ -56,7 +56,7 @@ notes, the git workflow, and troubleshooting.
 
 ### `build`
 
-Builds `compass-rl:latest` from `nvcr.io/nvidia/isaac-lab:3.0.0-rc1`
+Builds `compass-rl:latest` from `nvcr.io/nvidia/isaac-lab:3.0.0`
 by default. `COMPASS_BASE_IMAGE` selects the full Isaac Lab base image reference
 (registry, repository, and tag or digest). `COMPASS_IMAGE_TAG` names the resulting
 COMPASS image; an explicit `./docker/run.sh build mytag` overrides that output tag.
@@ -65,9 +65,9 @@ Re-running is fast because Docker layer-caches.
 To build against another compatible Isaac Lab image:
 
 ```bash
-# Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0-rc1.
+# Replace <isaac-lab-image> with an image reference, such as nvcr.io/nvidia/isaac-lab:3.0.0.
 export COMPASS_BASE_IMAGE="<isaac-lab-image>"
-# Choose a tag matching your base image version, such as isaaclab-3.0.0-rc1 (default: latest).
+# Choose a tag matching your base image version, such as isaaclab-3.0.0 (default: latest).
 # Used to build compass-rl:<tag> and select it when launching the container.
 export COMPASS_IMAGE_TAG="<compass-image-tag>"
 ./docker/run.sh build
@@ -196,7 +196,7 @@ hooks live in the container, not on the host. So:
 
 ```
 docker/
-├── Dockerfile.rl            # Image: Isaac Lab 3.0.0-rc1 + COMPASS and OV dependencies
+├── Dockerfile.rl            # Image: Isaac Lab 3.0.0 + COMPASS and OV dependencies
 ├── Dockerfile.distillation  # Used by docker-only distillation runs (unrelated to dev env)
 ├── run.sh                   # build / assets / up / down / exec / shell / status
 ├── activate                 # source me: shim PATH + (compass-rl) prompt prefix

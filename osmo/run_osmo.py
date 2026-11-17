@@ -89,6 +89,13 @@ def parse_args():
             "--image",
             default="",
             help="Pre-built docker image. If empty, build+push using --registry-prefix.")
+        sp.add_argument("--base-image",
+                        default="",
+                        help="Base image passed as --build-arg COMPASS_BASE_IMAGE when building "
+                        "docker/Dockerfile.rl (train/eval/record). Ignored with --image. "
+                        "Defaults to the Dockerfile's base image. --camera-renderer ovrtx "
+                        "needs a kitless Isaac Lab image, e.g. "
+                        "nvcr.io/nvidia/isaac-lab:3.0.0-kitless.")
         sp.add_argument("--registry-prefix",
                         default=os.environ.get("COMPASS_OSMO_REGISTRY", ""),
                         help="Registry prefix for build+push (e.g. nvcr.io/<org>/<team>); "
@@ -227,8 +234,11 @@ def get_credential(name: str, prompt: bool) -> str:
     sys.exit(2)
 
 
-def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
-                         dry_run: bool) -> str:
+def build_and_push_image(experiment: str,
+                         registry_prefix: str,
+                         dockerfile: str,
+                         dry_run: bool,
+                         base_image: str = "") -> str:
     if not registry_prefix:
         sys.stderr.write("ERROR: --image not given and --registry-prefix is empty "
                          "(also $COMPASS_OSMO_REGISTRY).\n")
@@ -241,12 +251,12 @@ def build_and_push_image(experiment: str, registry_prefix: str, dockerfile: str,
         sys.stderr.write(message)
         sys.exit(2)
     image = f"{registry_prefix.rstrip('/')}/compass_{experiment}:{uuid.uuid4().hex[:8]}"
+    build_cmd = ["docker", "build", "--network=host", "-t", image, "-f", str(dockerfile_path)]
+    if base_image:
+        build_cmd += ["--build-arg", f"COMPASS_BASE_IMAGE={base_image}"]
+    build_cmd.append(str(REPO_ROOT))
     cmds = [
-        [
-            "docker", "build", "--network=host", "-t", image, "-f",
-            str(dockerfile_path),
-            str(REPO_ROOT)
-        ],
+        build_cmd,
         ["docker", "push", image],
     ]
     for cmd in cmds:
@@ -376,8 +386,17 @@ def main() -> None:
         image = args.image
     else:
         dockerfile = args.dockerfile or SUBCOMMAND_CONFIG[args.subcommand][1]
+        base_image = ""
+        if args.subcommand in ("train", "eval", "record"):
+            base_image = args.base_image
+            if not base_image and getattr(args, "camera_renderer", "") == "ovrtx":
+                print("WARNING: --camera-renderer ovrtx needs a kitless Isaac Lab base image; "
+                      "pass --base-image (e.g. nvcr.io/nvidia/isaac-lab:3.0.0-kitless).",
+                      file=sys.stderr)
+        elif args.base_image:
+            print("WARNING: --base-image is ignored for distill.", file=sys.stderr)
         image = build_and_push_image(args.experiment_name, args.registry_prefix, dockerfile,
-                                     args.dry_run)
+                                     args.dry_run, base_image)
 
     SUBCOMMAND_DISPATCH[args.subcommand](args, image, wandb_key, hf_token)
 
