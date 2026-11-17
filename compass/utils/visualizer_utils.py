@@ -86,8 +86,8 @@ def configure_camera_marker_updates(sim):
     def update_markers(event):
         # Isaac Lab dispatches these callbacks through active visualizers only.
         # Camera-only runs still create USD markers, initially at the origin.
-        if any(viz.supports_markers()
-               or (viz.supports_live_plots() and getattr(viz.cfg, "enable_live_plots", True))
+        if any(viz.supports_markers() or (
+                viz.supports_live_plots() and getattr(viz.cfg, "enable_live_plots", True))
                for viz in sim.visualizers):
             return
         sim.vis_marker_registry.dispatch_callbacks(event)
