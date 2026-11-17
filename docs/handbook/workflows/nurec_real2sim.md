@@ -25,7 +25,7 @@ python3 -m pip install --user -U 'huggingface_hub[cli]'
 git clone https://github.com/NVlabs/COMPASS.git
 cd COMPASS
 git fetch
-git checkout real2sim/isaaclab_3.1
+git checkout real2sim/isaaclab_3.0
 ```
 
 ### 3. Download assets and checkpoints
