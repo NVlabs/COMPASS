@@ -48,8 +48,8 @@ class BinarySceneExportTests(unittest.TestCase):
                         self.assertTrue(root.subLayerPaths[0].endswith(".usdc"))
                         result = Usd.Stage.Open(root)
                         # Export comments contain anonymous source identifiers.
-                        self.assertEqual(result.Flatten(False).ExportToString(),
-                                         self._flatten_text(expected))
+                        self.assertEqual(
+                            result.Flatten(False).ExportToString(), self._flatten_text(expected))
                         self.assertEqual(stage.ExportToString(), before)
                         attr = result.GetPrimAtPath("/World/envs/env_0/Gaussians").GetAttribute(
                             "radiance:sphericalHarmonicsCoefficients")

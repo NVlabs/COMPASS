@@ -390,9 +390,10 @@ def main() -> None:
         if args.subcommand in ("train", "eval", "record"):
             base_image = args.base_image
             if not base_image and getattr(args, "camera_renderer", "") == "ovrtx":
-                print("WARNING: --camera-renderer ovrtx needs a kitless Isaac Lab base image; "
-                      "pass --base-image (e.g. nvcr.io/nvidia/isaac-lab:3.0.0-kitless).",
-                      file=sys.stderr)
+                print(
+                    "WARNING: --camera-renderer ovrtx needs a kitless Isaac Lab base image; "
+                    "pass --base-image (e.g. nvcr.io/nvidia/isaac-lab:3.0.0-kitless).",
+                    file=sys.stderr)
         elif args.base_image:
             print("WARNING: --base-image is ignored for distill.", file=sys.stderr)
         image = build_and_push_image(args.experiment_name, args.registry_prefix, dockerfile,

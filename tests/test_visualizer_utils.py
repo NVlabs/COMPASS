@@ -71,7 +71,8 @@ class CameraMarkerUpdatesTests(unittest.TestCase):
         )
         # Match the runtime camera-pump order, registering it before COMPASS.
         sim.add_render_callback("physx_headless_video_pump",
-                                lambda event: frames.append(tuple(marker)), order=-10)
+                                lambda event: frames.append(tuple(marker)),
+                                order=-10)
         configure_camera_marker_updates(sim)
         configure_camera_marker_updates(sim)
         for position in [(2.0, -3.0, 0.0), (-4.0, 1.5, 0.0)]:
