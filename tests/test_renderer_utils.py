@@ -45,7 +45,7 @@ class RendererRuntimeTests(unittest.TestCase):
             self.assertEqual(args.physics_backend, "ovphysx")
             self.assertTrue(args.spg_runtime)
             self.assertEqual(args.kit_args, "")
-            self.assertEqual(os.environ["OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled"], "0")
+            self.assertEqual(dict(os.environ), {})
 
     def test_incompatible_physics_rejected_before_runtime_configuration(self):
         for renderer, backend in (("isaac_rtx", "ovphysx"), ("isaac_rtx", "newton"), ("ovrtx",
@@ -57,21 +57,15 @@ class RendererRuntimeTests(unittest.TestCase):
                     configure_renderer_runtime(args)
                 self.assertEqual(args.kit_args, "")
                 self.assertFalse(args.spg_runtime)
-                self.assertNotIn("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", os.environ)
+                self.assertEqual(dict(os.environ), {})
 
-    def test_ovrtx_spg_uses_environment_without_kit_args(self):
+    def test_ovrtx_spg_does_not_change_environment_or_kit_args(self):
         args = self.make_args()
         with patch.dict(os.environ, {}, clear=True):
             configure_renderer_runtime(args)
-            self.assertEqual(os.environ["OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled"], "0")
+            self.assertEqual(dict(os.environ), {})
         self.assertTrue(args.spg_runtime)
         self.assertEqual(args.kit_args, "")
-
-    def test_ovrtx_preserves_explicit_tonemapping(self):
-        key = "OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled"
-        with patch.dict(os.environ, {key: "1"}, clear=True):
-            configure_renderer_runtime(self.make_args())
-            self.assertEqual(os.environ[key], "1")
 
     def test_synthetic_scene_does_not_enable_spg(self):
         args = self.make_args(nurec_scene=None)
@@ -97,7 +91,7 @@ class RendererRuntimeTests(unittest.TestCase):
             with self.subTest(overrides=overrides), patch.dict(os.environ, {}, clear=True):
                 with self.assertRaises(ValueError):
                     configure_renderer_runtime(self.make_args(**overrides))
-                self.assertNotIn("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", os.environ)
+                self.assertEqual(dict(os.environ), {})
 
     def test_livestream_environment_and_cli_precedence(self):
         with patch.dict(os.environ, {"LIVESTREAM": "1"}, clear=True):
@@ -111,7 +105,7 @@ class RendererRuntimeTests(unittest.TestCase):
                               kit_args="--custom=value")
         with patch.dict(os.environ, {}, clear=True):
             configure_renderer_runtime(args)
-            self.assertNotIn("OVRTX_rtx_rtpt_gaussian_skipTonemapping_enabled", os.environ)
+            self.assertEqual(dict(os.environ), {})
         self.assertIn("--enable omni.rtx.spg", args.kit_args)
         self.assertIn("--custom=value", args.kit_args)
         configured = args.kit_args
