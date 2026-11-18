@@ -62,7 +62,7 @@ _compass_shim_cmds=(
     python python3
     uv
     pip pip3
-    isaaclab.sh
+    isaaclab
     tensorboard
     pytest
     yapf pylint

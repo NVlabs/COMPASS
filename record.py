@@ -16,6 +16,7 @@
 import argparse
 import os
 import subprocess
+import sys
 import random
 import shutil
 import yaml
@@ -43,7 +44,6 @@ def collect_data(dataset_config: dict, environments: list, base_policy_path: str
         wandb.init(project=wandb_project_name, entity=wandb_entity_name)
 
     # Record data for each embodiment and environment.
-    isaaclab_path = os.getenv("ISAACLAB_PATH")
     for embodiment, residual_policy in dataset_config['embodiment_policies'].items():
         if dataset_config['policy_ckpt_type'] == 'wandb_artifact':
             print(f'Collecting data for {embodiment} with {residual_policy}...')
@@ -62,9 +62,9 @@ def collect_data(dataset_config: dict, environments: list, base_policy_path: str
             if not os.path.exists(dataset_dir):
                 os.makedirs(dataset_dir)
             command = [
-                f"{isaaclab_path}/isaaclab.sh", "-p", 'run.py', '-c', 'configs/record_config.gin',
-                '-b', base_policy_path, '-p', residual_policy_path, '-o', dataset_dir,
-                '--embodiment', embodiment, '--environment', environment, '--headless'
+                sys.executable, 'run.py', '-c', 'configs/record_config.gin', '-b', base_policy_path,
+                '-p', residual_policy_path, '-o', dataset_dir, '--embodiment', embodiment,
+                '--environment', environment, '--headless'
             ]
             run(command)
 

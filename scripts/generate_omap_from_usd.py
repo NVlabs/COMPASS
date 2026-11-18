@@ -22,9 +22,9 @@ Output convention matches Isaac Sim's ROS occupancy-map export: the saved image
 is rotated 180 degrees from the raw generator buffer and the YAML ``origin`` is
 the world-coordinate of the bottom-left map cell.
 
-Run via the Isaac Lab Python wrapper:
+Run with the Isaac Lab Python environment:
 
-    ${ISAACLAB_PATH}/isaaclab.sh -p scripts/generate_omap_from_usd.py \
+    python scripts/generate_omap_from_usd.py \
         compass/rl_env/exts/mobility_es/mobility_es/usd/office/office.usd
 
 By default the PNG + YAML land at ``<usd_dir>/omap/`` next to the USD, which is

@@ -95,7 +95,7 @@ def parse_args():
                         "docker/Dockerfile.rl (train/eval/record). Ignored with --image. "
                         "Defaults to the Dockerfile's base image. --camera-renderer ovrtx "
                         "needs a kitless Isaac Lab image, e.g. "
-                        "nvcr.io/nvidia/isaac-lab:3.0.0-kitless.")
+                        "nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless.")
         sp.add_argument("--registry-prefix",
                         default=os.environ.get("COMPASS_OSMO_REGISTRY", ""),
                         help="Registry prefix for build+push (e.g. nvcr.io/<org>/<team>); "
@@ -392,7 +392,7 @@ def main() -> None:
             if not base_image and getattr(args, "camera_renderer", "") == "ovrtx":
                 print(
                     "WARNING: --camera-renderer ovrtx needs a kitless Isaac Lab base image; "
-                    "pass --base-image (e.g. nvcr.io/nvidia/isaac-lab:3.0.0-kitless).",
+                    "pass --base-image (e.g. nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless).",
                     file=sys.stderr)
         elif args.base_image:
             print("WARNING: --base-image is ignored for distill.", file=sys.stderr)

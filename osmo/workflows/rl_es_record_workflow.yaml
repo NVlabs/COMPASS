@@ -40,14 +40,14 @@ workflow:
           mv /usr/share/vulkan /usr/share/vulkan_hidden
         fi
 
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli login --token {{hf_token}}
+        python -m huggingface_hub.commands.huggingface_cli login --token {{hf_token}}
 
         # Generate your W&B API key: https://wandb.ai/authorize
         export WANDB_API_KEY={{wandb_api_key}}
 
         # Download and unpack the COMPASS USDs from HuggingFace.
         echo "Downloading compass_usds.zip from huggingface.co/nvidia/COMPASS"
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+        python -m huggingface_hub.commands.huggingface_cli \
             download nvidia/COMPASS compass_usds.zip --local-dir ./
         unzip -q -o compass_usds.zip
         mv groot_mobility_rl_es_usds/usd ./compass/rl_env/exts/mobility_es/mobility_es/
@@ -60,12 +60,12 @@ workflow:
         # Download X-Mobility base-policy checkpoint from HuggingFace.
         echo "Downloading X-Mobility checkpoint from huggingface.co/nvidia/X-Mobility"
         mkdir -p ./base_policy
-        ${ISAACLAB_PATH}/isaaclab.sh -p -m huggingface_hub.commands.huggingface_cli \
+        python -m huggingface_hub.commands.huggingface_cli \
             download nvidia/X-Mobility x_mobility-nav2-semantic_action_path.ckpt --local-dir ./base_policy
         mv ./base_policy/x_mobility-nav2-semantic_action_path.ckpt ./base_policy/model.ckpt
 
         # Launch recording.
-        CMD="${ISAACLAB_PATH}/isaaclab.sh -p record.py -c configs/distillation_dataset_config.yaml -o $OUTPUT_DIR -b ./base_policy/model.ckpt --dataset-name {{dataset_name}}"
+        CMD="python record.py -c configs/distillation_dataset_config.yaml -o $OUTPUT_DIR -b ./base_policy/model.ckpt --dataset-name {{dataset_name}}"
 
         echo $CMD
         eval $CMD

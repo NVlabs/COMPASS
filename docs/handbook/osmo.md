@@ -123,7 +123,7 @@ Default sweep covers `simple_office`, `warehouse_single_rack`, `warehouse_multi_
 If you do not pass `--image`, `run_osmo.py` will:
 
 1. Build the appropriate Dockerfile ([`docker/Dockerfile.rl`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.rl) for `train` / `eval` / `record`, [`docker/Dockerfile.distillation`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.distillation) for `distill`) tagged as `<registry-prefix>/compass_<experiment-name>:<short-uuid>`.
-   For `train` / `eval` / `record`, `--base-image <image>` sets the `COMPASS_BASE_IMAGE` build argument (default: the Dockerfile's base image; pass `nvcr.io/nvidia/isaac-lab:3.0.0-kitless` with `--camera-renderer ovrtx`).
+   For `train` / `eval` / `record`, `--base-image <image>` sets the `COMPASS_BASE_IMAGE` build argument (default: the Dockerfile's base image; pass `nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless` with `--camera-renderer ovrtx`).
 2. `docker push` that tag.
 3. Pass the resulting image into the `osmo workflow submit` command.
 

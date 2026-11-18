@@ -80,8 +80,8 @@ for your renderer:
 
 | Isaac Lab version | `COMPASS_BASE_IMAGE` | Renderer (`--camera-renderer`) | Physics backend | Known limitations |
 |---|---|---|---|---|
-| 3.0 GA | `nvcr.io/nvidia/isaac-lab:3.0.0` | `isaac_rtx` | PhysX | - |
-| 3.0 GA | `nvcr.io/nvidia/isaac-lab:3.0.0-kitless` | `ovrtx` | Newton with MJWarp (`newton`, default) or standalone OvPhysX (`ovphysx`) | OVRTX returns invalid depth; no Kit viewport. |
+| main (3.1) | `nvcr.io/0947644777160149/internal/isaac-lab:latest-main` | `isaac_rtx` | PhysX | - |
+| main (3.1) | `nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless` | `ovrtx` | Newton with MJWarp (`newton`, default) or standalone OvPhysX (`ovphysx`) | OVRTX returns invalid depth; no Kit viewport. |
 
 If a container already exists for this checkout, run `./docker/run.sh down`
 after rebuilding (or when switching between the 4.a and 4.b images) and before
@@ -123,9 +123,9 @@ No backend flags are needed. Add `--visualizer kit` for a Kit viewport or
 #### Build and start the container
 
 ```bash
-export COMPASS_BASE_IMAGE="nvcr.io/nvidia/isaac-lab:3.0.0"
-# Builds compass-rl:isaaclab-3.0.0 and selects it when launching the container.
-export COMPASS_IMAGE_TAG="isaaclab-3.0.0"
+export COMPASS_BASE_IMAGE="nvcr.io/0947644777160149/internal/isaac-lab:latest-main"
+# Builds compass-rl:isaaclab-main and selects it when launching the container.
+export COMPASS_IMAGE_TAG="isaaclab-main"
 
 ./docker/run.sh build
 source ./docker/activate
@@ -237,9 +237,9 @@ always pass `--visualizer none`. Newton is the default physics backend.
 #### Build and start the container
 
 ```bash
-export COMPASS_BASE_IMAGE="nvcr.io/nvidia/isaac-lab:3.0.0-kitless"
-# Builds compass-rl:isaaclab-3.0.0-kitless and selects it when launching the container.
-export COMPASS_IMAGE_TAG="isaaclab-3.0.0-kitless"
+export COMPASS_BASE_IMAGE="nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless"
+# Builds compass-rl:isaaclab-main-kitless and selects it when launching the container.
+export COMPASS_IMAGE_TAG="isaaclab-main-kitless"
 
 ./docker/run.sh down   # if a container from another image exists
 ./docker/run.sh build
@@ -349,7 +349,7 @@ the Hugging Face dataset default branch; pass it only to pin a specific
 revision.
 
 The launcher builds `docker/Dockerfile.rl` on its default base image
-(`nvcr.io/nvidia/isaac-lab:3.0.0`). Pass
+(`nvcr.io/0947644777160149/internal/isaac-lab:latest-main`). Pass
 `--base-image <image>` to build on a different one. Select the renderer with
 `--camera-renderer`.
 
@@ -358,8 +358,11 @@ The launcher builds `docker/Dockerfile.rl` on its default base image
 Training example:
 
 ```bash
+docker pull nvcr.io/0947644777160149/internal/isaac-lab:latest-main
+
 python osmo/run_osmo.py train \
     --experiment-name carter-galileo-osmo \
+    --base-image nvcr.io/0947644777160149/internal/isaac-lab:latest-main \
     --wandb-project compass-nurec \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
@@ -373,6 +376,7 @@ Evaluation example:
 ```bash
 python osmo/run_osmo.py eval \
     --experiment-name carter-galileo-osmo-eval \
+    --base-image nvcr.io/0947644777160149/internal/isaac-lab:latest-main \
     --wandb-project compass-nurec \
     --checkpoint <residual-wandb-artifact> \
     --embodiment carter \
@@ -390,9 +394,11 @@ same backend for training and evaluation.
 Training example:
 
 ```bash
+docker pull nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless
+
 python osmo/run_osmo.py train \
     --experiment-name carter-galileo-osmo-ovrtx \
-    --base-image nvcr.io/nvidia/isaac-lab:3.0.0-kitless \
+    --base-image nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless \
     --wandb-project compass-nurec \
     --embodiment carter \
     --nurec-scene nova_carter-galileo \
@@ -407,7 +413,7 @@ Evaluation example:
 ```bash
 python osmo/run_osmo.py eval \
     --experiment-name carter-galileo-osmo-ovrtx-eval \
-    --base-image nvcr.io/nvidia/isaac-lab:3.0.0-kitless \
+    --base-image nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless \
     --wandb-project compass-nurec \
     --checkpoint <residual-wandb-artifact> \
     --embodiment carter \
