@@ -1,0 +1,3 @@
+# Train/eval at a 10 Hz policy rate (the default).
+# Use together with a base config, e.g.: -c configs/train_config.gin configs/policy_rate_10hz.gin
+run.policy_rate_hz = 10

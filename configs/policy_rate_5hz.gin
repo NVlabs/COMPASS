@@ -1,0 +1,4 @@
+# Train/eval at a 5 Hz policy rate (matches X-Mobility and the ROS2 deployment).
+# Use together with a base config, e.g.: -c configs/train_config.gin configs/policy_rate_5hz.gin
+# Reward weights, contact history and render interval are rescaled from the 10 Hz defaults.
+run.policy_rate_hz = 5

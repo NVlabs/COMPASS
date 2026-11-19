@@ -160,6 +160,13 @@ def parse_args():
                        help="Number of GPUs (= torchrun ranks). All counts use the same "
                        "distributed workflow YAML; the trainer's distributed code paths are "
                        "world_size-aware so num_gpus=1 also works as a single-rank run.")
+    train.add_argument("--policy-rate-hz",
+                       type=int,
+                       choices=(5, 10),
+                       default=None,
+                       help="Policy decision rate. Layers configs/policy_rate_<N>hz.gin on the "
+                       "train config (rescales reward weights / contact history). Default: "
+                       "unchanged config (10 Hz).")
     add_nurec(train)
     add_renderer(train)
 
@@ -304,6 +311,7 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "num_envs": args.num_envs,
         "camera_renderer": args.camera_renderer,
         "physics_backend": args.physics_backend,
+        "policy_rate_hz": str(args.policy_rate_hz or ""),
         "wandb_api_key": wandb_key,
         "wandb_project_name": args.wandb_project,
         "wandb_run_name": args.experiment_name,

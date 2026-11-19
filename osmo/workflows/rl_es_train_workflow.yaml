@@ -128,6 +128,12 @@ workflow:
           RESUME_CKPT=$(ls ./resume_ckpt/model_*.pt | sort -V | tail -n 1)
         fi
 
+        # Optional policy decision rate (5 or 10 Hz); layered on top of the base gin config.
+        POLICY_RATE_HZ="{{policy_rate_hz}}"
+        if [[ -n "$POLICY_RATE_HZ" ]]; then
+          TRAIN_CONFIG+=" configs/policy_rate_${POLICY_RATE_HZ}hz.gin"
+        fi
+
         # Launch training across {{num_gpus}} GPUs via torchrun. Each rank
         # spawns its own Isaac Sim instance + env; gradients sync via manual
         # all-reduce in PPO.update. Total parallel envs = {{num_gpus}} *
@@ -211,6 +217,7 @@ default-values:
   num_envs: 32
   camera_renderer: isaac_rtx
   physics_backend: ""
+  policy_rate_hz: ""
   no_residual: ""
   resume_ckpt_artifact: ""
   embodiment: ""

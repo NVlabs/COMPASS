@@ -313,6 +313,38 @@ def gin_config_to_dictionary(gin_config):
     return config_dict
 
 
+# Policy rate (Hz) that the default env config and reward weights are tuned for.
+REFERENCE_POLICY_RATE_HZ = 10.0
+
+
+def _apply_policy_rate(env_cfg, policy_rate_hz):
+    """Set the policy decision rate (e.g. 5 or 10 Hz) of the environment.
+
+    The physics step is unchanged; only the decimation changes. Time-dependent settings are
+    rescaled relative to the 10 Hz defaults: every reward term is multiplied by the step duration
+    by Isaac Lab, so weights are scaled by ``reference_dt / step_dt`` (0.5x at 5 Hz), and the
+    contact-sensor history is scaled so it covers the same fraction of each decision.
+    """
+    decimation = round(1.0 / (policy_rate_hz * env_cfg.sim.dt))
+    if decimation < 1:
+        raise ValueError(f"policy_rate_hz={policy_rate_hz} is faster than the physics step")
+    ref_decimation = env_cfg.decimation
+    step_dt = decimation * env_cfg.sim.dt
+    env_cfg.decimation = decimation
+    env_cfg.sim.render_interval = decimation
+    if env_cfg.rewards is not None:
+        scale = (1.0 / REFERENCE_POLICY_RATE_HZ) / step_dt
+        for term in vars(env_cfg.rewards).values():
+            if hasattr(term, "weight"):
+                term.weight *= scale
+    contact_forces = getattr(env_cfg.scene, "contact_forces", None)
+    if contact_forces is not None:
+        contact_forces.history_length = max(
+            1, round(contact_forces.history_length * decimation / ref_decimation))
+    print(f"[INFO] Policy rate {policy_rate_hz} Hz: decimation={decimation}, "
+          f"step_dt={step_dt:.3f}s")
+
+
 @gin.configurable
 def run(
     run_mode,
@@ -330,6 +362,7 @@ def run(
     disable_terrain=False,
     render_interval=None,
     num_rerenders_on_reset=None,
+    policy_rate_hz=None,
 ):
 
     # New launchers no longer expose ranks; torchrun provides them in the environment.
@@ -401,6 +434,8 @@ def run(
     if environment not in EnvSceneAssetCfgMap:
         raise ValueError(f"Unsupported environment type: {environment}")
     env_cfg.scene.environment = EnvSceneAssetCfgMap[environment]
+    if policy_rate_hz is not None:
+        _apply_policy_rate(env_cfg, policy_rate_hz)
     if render_interval is not None:
         env_cfg.sim.render_interval = render_interval
     if num_rerenders_on_reset is not None:
