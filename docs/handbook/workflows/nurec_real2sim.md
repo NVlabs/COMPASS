@@ -435,8 +435,10 @@ Use W&B videos and robot-camera debug images for run inspection. Add
 ## Rendering benchmark
 
 Setup: 8 × L40 (48 GB), 32 envs/GPU; Carter in Galileo with
-`particle_spg-runtime.usdz`, Isaac RTX + PhysX, 512 × 320 camera.
+`particle_spg-runtime.usdz`, 512 × 320 camera.
 Sim rates (not wall-clock throughput): physics/policy/rendering = 200/10/40 Hz.
+
+### Isaac RTX + PhysX
 
 Mean iteration wall time on rank 0 (256 policy steps + PPO update/setup):
 
@@ -457,6 +459,28 @@ Rendering time per 32-env batch on rank 0:
 | Render call | ≤ 153 ms |
 | Policy step (4 renders) | 611 ms |
 | Rollout (256 steps) | 156.3 s |
+
+### OVRTX + Newton
+
+Same setup with `--camera-renderer ovrtx` (Newton with MJWarp) on the Isaac Lab
+`main` kitless image, run through OSMO. Mean over 342 iterations on rank 0,
+after dropping the first 5 warm-up iterations.
+
+| Component | Time | Share |
+|---|---|---|
+| Base policy | 69.2 s | 66.2% |
+| Rendering and RGB observation | 14.9 s | 14.2% |
+| Physics | 9.1 s | 8.7% |
+| Other observation terms | 3.7 s | 3.6% |
+| PPO update | 0.5 s | 0.4% |
+| Other | 7.2 s | 6.9% |
+| **Total** | **104.5 s** | **100%** |
+
+Compared with Isaac RTX + PhysX, the iteration is about 3.3× faster
+(347 s to 104.5 s). Rendering plus RGB observation drops from 188 s to 15 s,
+and physics from 52 s to 9 s. The base policy takes the same time in both, so it
+becomes the main cost. The depth observation is not rendered under OVRTX (see
+the renderer and base image table), so these numbers do not include it.
 
 ## Troubleshooting
 
