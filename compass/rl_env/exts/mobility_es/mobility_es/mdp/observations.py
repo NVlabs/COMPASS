@@ -26,6 +26,15 @@ from mobility_es.mdp.utils import goal_pose_in_robot_frame
 from mobility_es.wrapper.env_wrapper import RLESEnvWrapper
 
 
+def _as_torch(data):
+    """Return a torch tensor for Isaac Lab sensor data.
+
+    Isaac Lab main wraps sensor buffers in ``ProxyArray`` (exposing ``.torch``)
+    instead of returning ``torch.Tensor``.
+    """
+    return data.torch if hasattr(data, "torch") else data
+
+
 def root_speed(
         env: RLESEnvWrapper,
         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
@@ -49,7 +58,8 @@ def camera_img(env: RLESEnvWrapper, data_type: str = "rgb"):
     if data_type not in supported_data_types:
         raise ValueError(f"data type {data_type} is not in the support list {supported_data_types}")
     camera = env.scene["camera"]
-    return camera.data.output[data_type].reshape((camera.data.output[data_type].shape[0], -1))
+    image = _as_torch(camera.data.output[data_type])
+    return image.reshape((image.shape[0], -1))
 
 
 def camera_to_world(env: RLESEnvWrapper):
@@ -94,7 +104,7 @@ def camera_to_world(env: RLESEnvWrapper):
 
 def camera_intrinsics(env: RLESEnvWrapper):
     camera = env.scene["camera"]
-    return camera.data.intrinsic_matrices
+    return _as_torch(camera.data.intrinsic_matrices)
 
 
 def upsample_segments(start_pose, end_pose, d_max=1.0, n_segments=10):

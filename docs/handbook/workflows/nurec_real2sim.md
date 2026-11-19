@@ -72,9 +72,9 @@ NuRec maps use a ROS bottom-left origin convention. The registry sets this by
 default; using the wrong convention leads to bad robot spawn locations.
 ```
 
-### 4. Choose a renderer and base image
+### 4. Run training and evaluation
 
-COMPASS supports three renderer/physics combinations in Isaac Lab 3.0:
+COMPASS supports three renderer/physics combinations in Isaac Lab main (3.1):
 Isaac RTX + PhysX, OVRTX + Newton, and OVRTX + OvPhysX. Choose the base image
 for your renderer:
 
@@ -84,12 +84,12 @@ for your renderer:
 | main (3.1) | `nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless` | `ovrtx` | Newton with MJWarp (`newton`, default) or standalone OvPhysX (`ovphysx`) | OVRTX returns invalid depth; no Kit viewport. |
 
 If a container already exists for this checkout, run `./docker/run.sh down`
-after rebuilding (or when switching between the 4.a and 4.b images) and before
+after rebuilding (or when switching between the Isaac RTX and OVRTX images) and before
 activation so the new image is used.
 
 #### Common options
 
-These flags apply to both renderers in 4.a and 4.b:
+These flags apply to both renderers, covered in the next two sections:
 
 - `--embodiment`: `h1`, `spot`, `carter`, `g1`, or `digit`.
 - `--nurec-scene`: any installed NuRec scene folder. This is a NuRec-specific
@@ -115,12 +115,13 @@ These flags apply to both renderers in 4.a and 4.b:
 Output checkpoints are written as `<output_dir>/model_<iter>.pt`; check
 `<output_dir>/videos/` for rollout videos.
 
-### 4.a Isaac RTX + PhysX
+#### Use the Isaac RTX renderer with PhysX
 
-No backend flags are needed. Add `--visualizer kit` for a Kit viewport or
-`--visualizer none` to disable visualization.
+This combination runs on Isaac Sim's Kit-based Isaac RTX renderer with PhysX physics.
+It is the default, so no backend flags are needed. Add `--visualizer kit` for a Kit
+viewport or `--visualizer none` to disable visualization.
 
-#### Build and start the container
+##### Build and start the container
 
 ```bash
 export COMPASS_BASE_IMAGE="nvcr.io/0947644777160149/internal/isaac-lab:latest-main"
@@ -139,7 +140,7 @@ python scripts/play.py --visualizer kit
 cd -
 ```
 
-#### Train
+##### Train
 
 Train with the default particle-field USD (SPG-runtime):
 
@@ -160,7 +161,7 @@ This command uses the default `particle_spg-runtime.usdz`. Use
 `--nurec-usd-file <filename>` to choose another USD from the selected scene
 folder.
 
-#### Visualization
+##### Visualization
 
 | Kit viewport | Robot camera |
 |---|---|
@@ -188,7 +189,7 @@ camera:
 - OOM recovery: reduce `--num_envs`
 ```
 
-#### Train on multiple GPUs
+##### Train on multiple GPUs
 
 ```bash
 python -m torch.distributed.run --nproc_per_node=<N> \
@@ -208,7 +209,7 @@ python -m torch.distributed.run --nproc_per_node=<N> \
 process per GPU). `--num_envs` is per GPU. Run headless for multi-GPU by omitting
 `--visualizer kit`. Rank 0 owns logging, checkpoints, and video.
 
-#### Evaluate
+##### Evaluate
 
 ```bash
 python run.py \
@@ -229,12 +230,14 @@ python run.py \
 Omit `--visualizer kit` for faster evaluation without GUI. The viewport can be
 an extremely novel view and can have occlusion.
 
-### 4.b OVRTX
+#### Use the OVRTX renderer with Newton
 
-OVRTX runs without starting Kit, so it does not support `--visualizer kit`;
-always pass `--visualizer none`. Newton is the default physics backend.
+This combination renders with the standalone OVRTX renderer and simulates with Newton
+(MJWarp), without starting Kit. Because there is no Kit, `--visualizer kit` is not
+supported: always pass `--visualizer none`. Newton is the default physics backend;
+select standalone OvPhysX with `--physics-backend ovphysx`.
 
-#### Build and start the container
+##### Build and start the container
 
 ```bash
 export COMPASS_BASE_IMAGE="nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless"
@@ -246,7 +249,7 @@ export COMPASS_IMAGE_TAG="isaaclab-main-kitless"
 source ./docker/activate
 ```
 
-#### Train
+##### Train
 
 ```bash
 python run.py \
@@ -268,7 +271,7 @@ To use OvPhysX instead of Newton, select the physics backend explicitly:
 --camera-renderer ovrtx --physics-backend ovphysx --visualizer none
 ```
 
-#### Train on multiple GPUs
+##### Train on multiple GPUs
 
 ```bash
 python -m torch.distributed.run --nproc_per_node=<N> \
@@ -289,7 +292,7 @@ python -m torch.distributed.run --nproc_per_node=<N> \
 `--nproc_per_node` is the number of GPUs on this machine, and `--num_envs` is per
 GPU. Add `--physics-backend ovphysx` to use OvPhysX.
 
-#### Evaluate
+##### Evaluate
 
 ```bash
 python run.py \
@@ -353,7 +356,7 @@ The launcher builds `docker/Dockerfile.rl` on its default base image
 `--base-image <image>` to build on a different one. Select the renderer with
 `--camera-renderer`.
 
-### Isaac RTX + PhysX
+### Use the Isaac RTX renderer with PhysX
 
 Training example:
 
@@ -385,7 +388,7 @@ python osmo/run_osmo.py eval \
     --num-envs 32
 ```
 
-### OVRTX
+### Use the OVRTX renderer with Newton
 
 The workflow adds `--visualizer none` for OVRTX; `--physics-backend` defaults to
 `newton`. Add `--physics-backend ovphysx` to use OvPhysX instead, and use the

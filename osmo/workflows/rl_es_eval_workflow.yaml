@@ -29,6 +29,9 @@ workflow:
     args: ["/tmp/entry.sh"]
     environment:
       ACCEPT_EULA: Y
+      # OVRTX's denoiser needs the host's libnvidia-ngx.so. OSMO nodes only inject it
+      # when the `ngx` capability is requested; without it, renders are very noisy.
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,ngx
     files:
     - contents: |
         # Set up environment

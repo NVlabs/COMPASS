@@ -119,9 +119,16 @@ def apply_camera_renderer_settings(env_cfg, args):
     if getattr(args, "nurec_scene", None):
         from isaaclab_ov.renderers import ovrtx_renderer
 
-        from compass.utils.ovrtx_usd import export_stage_to_binary_sublayer
+        from compass.utils.ovrtx_usd import export_stage_to_binary_sublayer, legacy_export_available
 
-        ovrtx_renderer.export_stage_to_string = export_stage_to_binary_sublayer
+        # The binary-sublayer export only matches Isaac Lab's older
+        # export_stage_to_string(stage, num_envs, ...) signature. Isaac Lab main
+        # moved it to isaaclab_ov.stage with a clone-plan based signature.
+        if legacy_export_available():
+            ovrtx_renderer.export_stage_to_string = export_stage_to_binary_sublayer
+        else:
+            print("[COMPASS] Isaac Lab's OVRTX stage export changed; using its built-in export "
+                  "instead of the NuRec binary-sublayer patch.")
 
     # Both choices run without Isaac Sim's Kit-based PhysX runtime.
     if args.physics_backend == "ovphysx":
@@ -130,7 +137,7 @@ def apply_camera_renderer_settings(env_cfg, args):
         env_cfg.sim.physics = OvPhysxCfg()
     else:
         from isaaclab_newton.physics import NewtonCfg
-        from isaaclab_newton.physics.mjwarp_manager_cfg import MJWarpSolverCfg
+        from isaaclab_newton.physics.mjwarp_solver_cfg import MJWarpSolverCfg
 
         solver_cfg = MJWarpSolverCfg()
         if getattr(args, "nurec_scene", None):

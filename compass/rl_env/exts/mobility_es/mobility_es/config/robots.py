@@ -62,7 +62,7 @@ carter = ArticulationCfg(
                     "joint_caster_left",
                     "joint_caster_right",
                 ],
-                velocity_limit_sim=360.0,
+                joint_velocity_limit=360.0,
                 stiffness=0.0,
                 damping=0.0,
             ),
@@ -108,8 +108,8 @@ h1 = ArticulationCfg(
         "legs":
             ImplicitActuatorCfg(
                 joint_names_expr=[".*_hip_yaw", ".*_hip_roll", ".*_hip_pitch", ".*_knee", "torso"],
-                effort_limit=300,
-                velocity_limit=100.0,
+                joint_effort_limit=300,
+                actuator_velocity_limit=100.0,
                 stiffness={
                     ".*_hip_yaw": 150.0,
                     ".*_hip_roll": 150.0,
@@ -128,8 +128,8 @@ h1 = ArticulationCfg(
         "feet":
             ImplicitActuatorCfg(
                 joint_names_expr=[".*_ankle"],
-                effort_limit=100,
-                velocity_limit=100.0,
+                joint_effort_limit=100,
+                actuator_velocity_limit=100.0,
                 stiffness={".*_ankle": 20.0},
                 damping={".*_ankle": 4.0},
             ),
@@ -138,8 +138,8 @@ h1 = ArticulationCfg(
                 joint_names_expr=[
                     ".*_shoulder_pitch", ".*_shoulder_roll", ".*_shoulder_yaw", ".*_elbow"
                 ],
-                effort_limit=300,
-                velocity_limit=100.0,
+                joint_effort_limit=300,
+                actuator_velocity_limit=100.0,
                 stiffness={
                     ".*_shoulder_pitch": 40.0,
                     ".*_shoulder_roll": 40.0,
@@ -305,7 +305,7 @@ spot = ArticulationCfg(
         "spot_hip":
             DelayedPDActuatorCfg(
                 joint_names_expr=[".*_h[xy]"],
-                effort_limit=45.0,
+                actuator_effort_limit=45.0,
                 stiffness=60.0,
                 damping=1.5,
                 min_delay=0,    # physics time steps (min: 2.0*0=0.0ms)
@@ -315,7 +315,6 @@ spot = ArticulationCfg(
             RemotizedPDActuatorCfg(
                 joint_names_expr=[".*_kn"],
                 joint_parameter_lookup=spot_joint_parameter_lookup,
-                effort_limit=None,
                 stiffness=60.0,
                 damping=1.5,
                 min_delay=0,    # physics time steps (min: 2.0*0=0.0ms)
@@ -372,8 +371,8 @@ g1 = ArticulationCfg(
                     ".*_knee_joint",
                     "torso_joint",
                 ],
-                effort_limit=300,
-                velocity_limit=100.0,
+                joint_effort_limit=300,
+                actuator_velocity_limit=100.0,
                 stiffness={
                     ".*_hip_yaw_joint": 150.0,
                     ".*_hip_roll_joint": 150.0,
@@ -396,7 +395,7 @@ g1 = ArticulationCfg(
             ),
         "feet":
             ImplicitActuatorCfg(
-                effort_limit=20,
+                joint_effort_limit=20,
                 joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
                 stiffness=20.0,
                 damping=2.0,
@@ -418,8 +417,8 @@ g1 = ArticulationCfg(
                     ".*_one_joint",
                     ".*_two_joint",
                 ],
-                effort_limit=300,
-                velocity_limit=100.0,
+                joint_effort_limit=300,
+                actuator_velocity_limit=100.0,
                 stiffness=40.0,
                 damping=10.0,
                 armature={

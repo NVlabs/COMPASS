@@ -21,20 +21,21 @@
 # the end is left as a single-process invocation since eval doesn't benefit
 # from multi-GPU and the residual policy is small.
 #
-# cpu / memory are sized for an 8x L40 node and are NOT scaled per
-# num_gpus — running with num_gpus < 8 over-allocates harmlessly; running
-# with num_gpus > 8 would require bumping both knobs and picking a larger
-# platform.
+# cpu / memory / storage are passed in by run_osmo.py, scaled per GPU
+# (10 CPU, 100Gi memory, 50Gi storage each; 8 GPUs = 80 / 800Gi / 400Gi).
+# OSMO rejects a request that asks for more than its GPU fraction of a node,
+# so num_gpus < 8 must not keep the 8-GPU values. num_gpus > 8 would need a
+# larger platform.
 version: 2
 workflow:
   name: {{workflow_name}}
   resources:
     default:
-      cpu: 80
+      cpu: {{cpu}}
       gpu: {{num_gpus}}
-      memory: 800Gi
+      memory: {{memory}}
       platform: ovx-l40
-      storage: 400Gi
+      storage: {{storage}}
   tasks:
   - name: train
     image: {{image}}
@@ -42,6 +43,9 @@ workflow:
     args: ["/tmp/entry.sh"]
     environment:
       ACCEPT_EULA: Y
+      # OVRTX's denoiser needs the host's libnvidia-ngx.so. OSMO nodes only inject it
+      # when the `ngx` capability is requested; without it, renders are very noisy.
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,ngx
     files:
     - contents: |
         # Set up environment
@@ -201,6 +205,9 @@ default-values:
   image: ""
   workflow_name: compass_rl_es_train
   num_gpus: 8
+  cpu: 80
+  memory: 800Gi
+  storage: 400Gi
   num_envs: 32
   camera_renderer: isaac_rtx
   physics_backend: ""

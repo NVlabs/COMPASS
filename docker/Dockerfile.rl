@@ -9,6 +9,10 @@ ENV ACCEPT_EULA=Y
 ENV OMNI_KIT_ALLOW_ROOT=1
 USER root
 
+# The OSMO workflows unzip compass_usds.zip; the Isaac Lab main images no longer ship unzip.
+RUN apt-get update && apt-get install -y --no-install-recommends unzip \
+ && rm -rf /var/lib/apt/lists/*
+
 # Read the OV extra versions and compatibility overrides from the base image.
 COPY docker/install_ov_extras.py /tmp/install_ov_extras.py
 RUN python /tmp/install_ov_extras.py

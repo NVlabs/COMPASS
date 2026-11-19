@@ -292,6 +292,10 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
         "image": image,
         "num_gpus": args.num_gpus,
+        # OSMO caps resources at the requested GPU fraction of a node (8x L40).
+        "cpu": 10 * args.num_gpus,
+        "memory": f"{100 * args.num_gpus}Gi",
+        "storage": f"{50 * args.num_gpus}Gi",
         "num_envs": args.num_envs,
         "camera_renderer": args.camera_renderer,
         "physics_backend": args.physics_backend,

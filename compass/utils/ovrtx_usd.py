@@ -17,6 +17,16 @@ def _export_directory():
     return directory
 
 
+def legacy_export_available():
+    """Whether Isaac Lab still provides the helper the binary export builds on."""
+    try:
+        from isaaclab_ov.renderers.ovrtx_usd import \
+            _collect_prims_to_deactivate  # pylint: disable=unused-import,import-outside-toplevel
+    except ImportError:
+        return False
+    return True
+
+
 def export_stage_to_binary_sublayer(stage, num_envs, source_paths, keep_env_roots=True):
     """Return a small USDA layer referencing a flattened binary scene.
 

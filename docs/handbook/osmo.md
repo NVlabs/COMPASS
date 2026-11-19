@@ -124,6 +124,8 @@ If you do not pass `--image`, `run_osmo.py` will:
 
 1. Build the appropriate Dockerfile ([`docker/Dockerfile.rl`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.rl) for `train` / `eval` / `record`, [`docker/Dockerfile.distillation`](https://github.com/NVlabs/COMPASS/blob/main/docker/Dockerfile.distillation) for `distill`) tagged as `<registry-prefix>/compass_<experiment-name>:<short-uuid>`.
    For `train` / `eval` / `record`, `--base-image <image>` sets the `COMPASS_BASE_IMAGE` build argument (default: the Dockerfile's base image; pass `nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless` with `--camera-renderer ovrtx`).
+
+   The `train` / `eval` / `record` workflows set `NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,ngx` on the task. OSMO nodes only inject the host's `libnvidia-ngx.so` when the `ngx` capability is requested; without it OVRTX logs `Failed to create NGX context` and its renders are very noisy.
 2. `docker push` that tag.
 3. Pass the resulting image into the `osmo workflow submit` command.
 
