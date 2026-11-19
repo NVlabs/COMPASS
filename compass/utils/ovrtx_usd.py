@@ -12,7 +12,8 @@ from functools import lru_cache
 def _export_directory():
     # OVRTX may read the sublayer after initial import. Keep it until process exit,
     # including across multiple renderer instances, and isolate distributed ranks.
-    directory = tempfile.TemporaryDirectory(prefix="compass_ovrtx_")
+    directory = tempfile.TemporaryDirectory(    # pylint: disable=consider-using-with
+        prefix="compass_ovrtx_")
     atexit.register(directory.cleanup)
     return directory
 
@@ -36,8 +37,10 @@ def export_stage_to_binary_sublayer(stage, num_envs, source_paths, keep_env_root
     Match Isaac Lab's source pruning for both legacy and ovstage cloning, using
     an export-only session so the simulation stage remains unchanged.
     """
+    # pylint: disable=import-outside-toplevel
     from isaaclab_ov.renderers.ovrtx_usd import _collect_prims_to_deactivate
     from pxr import Sdf, Usd
+    # pylint: enable=import-outside-toplevel
 
     export_stage = stage
     if num_envs > 1:

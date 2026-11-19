@@ -73,9 +73,9 @@ deactivate                     # remove the shim PATH; keep the container alive
 ./docker/run.sh down           # stop the container entirely
 ```
 
-If you can't run Docker, you'll need to install Isaac Lab v3.0.0-beta1 and
+If you can't run Docker, you'll need to install Isaac Lab v3.0.0 and
 the `mobility_es` extension on the host directly — follow the
-[Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta1/source/setup/installation/index.html)
+[Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/setup/installation/index.html)
 and then `${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -e compass/rl_env/exts/mobility_es`.
 Docker is the supported / tested path; bare-metal works but isn't documented
 end-to-end in the handbook.

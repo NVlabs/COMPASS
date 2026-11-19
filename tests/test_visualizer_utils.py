@@ -90,6 +90,7 @@ class CameraMarkerUpdatesTests(unittest.TestCase):
             (False, False, False, 1),
         ]:
             with self.subTest(markers=markers, plots=plots, plots_enabled=plots_enabled):
+                # pylint: disable=cell-var-from-loop
                 viz = SimpleNamespace(
                     supports_markers=lambda: markers,
                     supports_live_plots=lambda: plots,

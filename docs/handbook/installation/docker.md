@@ -10,7 +10,7 @@ Docker is the recommended path because the image bakes Isaac Lab, the
 X-Mobility wheel, and the `mobility_es` extension at build time — no host
 Python / Vulkan SDK to manage. Bare-metal install is possible but not
 documented end-to-end in the handbook; see the
-[Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v3.0.0-beta1/source/setup/installation/index.html)
+[Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/setup/installation/index.html)
 and `${ISAACLAB_PATH}/isaaclab.sh -p -m pip install -e compass/rl_env/exts/mobility_es`.
 :::
 

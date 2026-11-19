@@ -94,8 +94,7 @@ def parse_args():
                         help="Base image passed as --build-arg COMPASS_BASE_IMAGE when building "
                         "docker/Dockerfile.rl (train/eval/record). Ignored with --image. "
                         "Defaults to the Dockerfile's base image. --camera-renderer ovrtx "
-                        "needs a kitless Isaac Lab image, e.g. "
-                        "nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless.")
+                        "needs a kitless Isaac Lab image.")
         sp.add_argument("--registry-prefix",
                         default=os.environ.get("COMPASS_OSMO_REGISTRY", ""),
                         help="Registry prefix for build+push (e.g. nvcr.io/<org>/<team>); "
@@ -280,6 +279,12 @@ def validate_nurec_args(args) -> None:
                          "--nurec-scene and --environment. The workflow uses "
                          "--nurec-scene as run.py's runtime environment.\n")
         sys.exit(2)
+    if getattr(args, "nurec_scene", "") and not getattr(args, "embodiment", ""):
+        sys.stderr.write(
+            "WARNING: --nurec-scene without --embodiment uses the gin default embodiment "
+            "(g1). NuRec scenes such as nova_carter-galileo are captured for Nova Carter; "
+            "a mismatched robot can put the camera inside the robot body and produce "
+            "black frames. Pass --embodiment carter.\n")
 
 
 def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
@@ -292,7 +297,7 @@ def cmd_train(args, image: str, wandb_key: str, hf_token: str) -> None:
         "workflow_name": f"compass_rl_es_{args.experiment_name}",
         "image": image,
         "num_gpus": args.num_gpus,
-        # OSMO caps resources at the requested GPU fraction of a node (8x L40).
+    # OSMO caps resources at the requested GPU fraction of a node (8x L40).
         "cpu": 10 * args.num_gpus,
         "memory": f"{100 * args.num_gpus}Gi",
         "storage": f"{50 * args.num_gpus}Gi",
@@ -396,7 +401,7 @@ def main() -> None:
             if not base_image and getattr(args, "camera_renderer", "") == "ovrtx":
                 print(
                     "WARNING: --camera-renderer ovrtx needs a kitless Isaac Lab base image; "
-                    "pass --base-image (e.g. nvcr.io/0947644777160149/internal/isaac-lab:latest-main-kitless).",
+                    "pass --base-image.",
                     file=sys.stderr)
         elif args.base_image:
             print("WARNING: --base-image is ignored for distill.", file=sys.stderr)

@@ -10,11 +10,13 @@ try:
 except ImportError:
     Usd = None
 
-from compass.utils.ovrtx_usd import export_stage_to_binary_sublayer
+from compass.utils.ovrtx_usd import export_stage_to_binary_sublayer, legacy_export_available
 
 
-@unittest.skipIf(Usd is None, "Requires the Isaac Lab USD runtime")
+@unittest.skipIf(Usd is None or not legacy_export_available(),
+                 "Requires an Isaac Lab release that still has the legacy OVRTX export helpers")
 class BinarySceneExportTests(unittest.TestCase):
+    """Binary export must match Isaac Lab's text export."""
 
     def make_stage(self):
         stage = Usd.Stage.CreateInMemory()

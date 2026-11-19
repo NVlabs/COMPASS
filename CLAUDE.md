@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-COMPASS is a cross-embodiment mobility policy framework: imitation learning + residual RL specialists per embodiment, distilled into one generalist policy, exported to ONNX/TensorRT, deployed via ROS2. Built on Isaac Lab 3.0.0-beta1 / Isaac Sim 4.5 and on top of NVIDIA's [X-Mobility](https://github.com/NVlabs/X-MOBILITY) base policy.
+COMPASS is a cross-embodiment mobility policy framework: imitation learning + residual RL specialists per embodiment, distilled into one generalist policy, exported to ONNX/TensorRT, deployed via ROS2. Built on Isaac Lab 3.0.0 / Isaac Sim 6.2 and on top of NVIDIA's [X-Mobility](https://github.com/NVlabs/X-MOBILITY) base policy.
 
 End-to-end pipeline (each stage has a top-level script):
 1. `run.py` — train residual RL specialist (or evaluate any policy) in Isaac Lab. Add `--distributed` and launch via `torch.distributed.run --nproc_per_node=N` for multi-GPU training.

@@ -37,7 +37,7 @@ Each stage has a top-level entry-point script in the repo:
 | 5 | Convert ONNX → TensorRT engine | [`trt_conversion.py`](https://github.com/NVlabs/COMPASS/blob/main/trt_conversion.py) |
 | 6 | Deploy via ROS2 in Isaac Sim or on real robots | [`ros2_deployment/`](https://github.com/NVlabs/COMPASS/tree/main/ros2_deployment) |
 
-Built on Isaac Lab 3.0 / Isaac Sim 4.5 and on top of NVIDIA's
+Built on Isaac Lab 3.0 / Isaac Sim 6.2 and on top of NVIDIA's
 [X-Mobility](https://github.com/NVlabs/X-MOBILITY) base policy.
 
 ---
