@@ -13,10 +13,6 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends unzip \
  && rm -rf /var/lib/apt/lists/*
 
-# Read the OV extra versions and compatibility overrides from the base image.
-COPY docker/install_ov_extras.py /tmp/install_ov_extras.py
-RUN python /tmp/install_ov_extras.py
-
 # COMPASS lives in /workspace/COMPASS so /workspace/isaaclab (from the base image)
 # is preserved when docker/run.sh bind-mounts the host repo at runtime.
 WORKDIR /workspace/COMPASS
