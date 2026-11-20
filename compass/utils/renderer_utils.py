@@ -50,7 +50,6 @@ ISAAC_RTX_CAMERA_RENDERER_SETTINGS = {
 
 # Additional camera renderer settings for NuRec USDs that require SPG runtime.
 NUREC_SPG_CAMERA_RENDERER_CARB_SETTINGS = {
-    "/rtx/rtpt/gaussian/skipTonemapping/enabled": False,
     "/rtx/rtpt/gaussian/accumulatedDepth/allHits/enabled": True,
     "/rtx/rtpt/gaussian/accumulatedAlbedo/enabled": True,
     "/rtx/rtpt/gaussian/maxGaussiansToAccumulate": 360,
@@ -112,10 +111,6 @@ def apply_camera_renderer_settings(env_cfg, args):
     from isaaclab_ov.renderers import OVRTXRendererCfg
 
     _configure_ovrtx_device(env_cfg.sim.device)
-    from compass.utils.ovrtx_render_product import configure_gaussian_hdr
-
-    configure_gaussian_hdr(
-        bool(getattr(args, "nurec_scene", None)) and bool(getattr(args, "spg_runtime", False)))
     if getattr(args, "nurec_scene", None):
         from isaaclab_ov.renderers import ovrtx_renderer
 
